@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { getStoredValue, setStoredValue } from './storage'
+import { syncState, onStateChange } from '../utils/stateSync'
 import type {
   NetworkName,
   NetworkStats,
@@ -82,9 +84,16 @@ export interface StoreState {
   setContractError: (e: string | null) => void
 }
 
+// ─── Persisted keys ───────────────────────────────────────────────────────────
+// Only lightweight UI preferences are persisted — large data (txs, ops) is
+// re-fetched on load and never written to IndexedDB.
+
+const PERSIST_KEYS: Array<keyof StoreState> = ['network', 'theme', 'activeTab']
+const STORE_PERSIST_KEY = 'store:preferences'
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>((set, get) => ({
   // Network
   network: 'testnet',
   setNetwork: (network) => {
@@ -178,3 +187,42 @@ export const useStore = create<StoreState>((set) => ({
   setContractLoading: (v) => set({ contractLoading: v }),
   setContractError: (e) => set({ contractError: e }),
 }))
+
+// ─── Persistence middleware ───────────────────────────────────────────────────
+// Hydrate persisted preferences once on startup, then sync writes to IDB.
+
+if (typeof window !== 'undefined') {
+  // Hydrate from IndexedDB on startup (#105)
+  getStoredValue(STORE_PERSIST_KEY).then((saved: Record<string, unknown> | null) => {
+    if (saved && typeof saved === 'object') {
+      const slice: Partial<StoreState> = {}
+      for (const key of PERSIST_KEYS) {
+        if (key in saved) (slice as Record<string, unknown>)[key] = saved[key as string]
+      }
+      if (Object.keys(slice).length > 0) useStore.setState(slice)
+    }
+  }).catch(() => {})
+
+  // Write persisted keys to IDB on every state change
+  useStore.subscribe((state) => {
+    const slice: Record<string, unknown> = {}
+    for (const key of PERSIST_KEYS) slice[key] = state[key]
+    syncState(STORE_PERSIST_KEY, slice).catch(() => {})
+  })
+
+  // Listen for cross-tab state changes and apply them (#105)
+  onStateChange((key: string, value: unknown) => {
+    if (key === STORE_PERSIST_KEY && value && typeof value === 'object') {
+      const current = useStore.getState()
+      const incoming = value as Record<string, unknown>
+      const patch: Partial<StoreState> = {}
+      for (const k of PERSIST_KEYS) {
+        // Last-writer-wins: apply incoming only if it differs from current
+        if (incoming[k] !== undefined && incoming[k] !== current[k]) {
+          (patch as Record<string, unknown>)[k] = incoming[k]
+        }
+      }
+      if (Object.keys(patch).length > 0) useStore.setState(patch)
+    }
+  })
+}

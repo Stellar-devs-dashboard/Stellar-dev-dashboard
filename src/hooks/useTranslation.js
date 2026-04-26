@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation as useI18nextTranslation } from "react-i18next";
 import { useI18nContext } from "../components/I18nProvider.jsx";
+import { RTL_LANGUAGES } from "../i18n/index.js";
 
 /**
  * useTranslation
@@ -53,14 +54,66 @@ export function useTranslation(ns = "translation") {
     [t],
   );
 
+  /**
+   * Pluralize helper (#107).
+   * Delegates to i18next count interpolation:
+   *   tPlural('transactions.count', 3) → uses key 'transactions.count_one' or 'transactions.count_other'
+   *
+   * @param {string} key
+   * @param {number} count
+   * @param {Record<string, unknown>} [extra]  Additional interpolation values
+   */
+  const tPlural = useCallback(
+    (key, count, extra = {}) => safeT(key, { count, ...extra }),
+    [safeT],
+  );
+
+  /**
+   * Format a number according to the current locale (#107).
+   * @param {number} value
+   * @param {Intl.NumberFormatOptions} [opts]
+   */
+  const formatNumber = useCallback(
+    (value, opts = {}) => {
+      try {
+        return new Intl.NumberFormat(currentLanguage, opts).format(value);
+      } catch {
+        return String(value);
+      }
+    },
+    [currentLanguage],
+  );
+
+  /**
+   * Format a date according to the current locale (#107).
+   * @param {Date | string | number} date
+   * @param {Intl.DateTimeFormatOptions} [opts]
+   */
+  const formatDate = useCallback(
+    (date, opts = { dateStyle: "medium" }) => {
+      try {
+        return new Intl.DateTimeFormat(currentLanguage, opts).format(new Date(date));
+      } catch {
+        return String(date);
+      }
+    },
+    [currentLanguage],
+  );
+
+  /** true if the active language is RTL (#107) */
+  const isRTLActive = isRTL || RTL_LANGUAGES.has(currentLanguage);
+
   return {
     t: safeT,
+    tPlural,
+    formatNumber,
+    formatDate,
     i18n,
     ready,
     currentLanguage,
     changeLanguage,
     supportedLanguages,
-    isRTL,
+    isRTL: isRTLActive,
   };
 }
 

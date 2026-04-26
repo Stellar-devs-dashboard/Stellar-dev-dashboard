@@ -4,11 +4,16 @@ import LanguageDetector from "i18next-browser-languagedetector";
 
 import en from "./en.json";
 import es from "./es.json";
+import zh from "./zh.json";
 
 export const SUPPORTED_LANGUAGES = [
-  { code: "en", label: "English", nativeLabel: "English" },
-  { code: "es", label: "Spanish", nativeLabel: "Español" },
+  { code: "en", label: "English",  nativeLabel: "English",  dir: "ltr" },
+  { code: "es", label: "Spanish",  nativeLabel: "Español",  dir: "ltr" },
+  { code: "zh", label: "Chinese",  nativeLabel: "中文",      dir: "ltr" },
 ];
+
+/** Languages that flow right-to-left (#107). */
+export const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur"]);
 
 export const DEFAULT_LANGUAGE = "en";
 export const LANGUAGE_STORAGE_KEY = "stellar-dashboard-lang";
@@ -16,6 +21,7 @@ export const LANGUAGE_STORAGE_KEY = "stellar-dashboard-lang";
 const resources = {
   en: { translation: en },
   es: { translation: es },
+  zh: { translation: zh },
 };
 
 i18n
@@ -37,6 +43,11 @@ i18n
       // React already handles XSS escaping
       escapeValue: false,
     },
+
+    // Enable pluralization support (#107).
+    // Keys with _one / _other suffixes are selected automatically.
+    // Example: t('transactions.count', { count: 3 }) → "3 笔交易"
+    pluralSeparator: "_",
 
     react: {
       // Wait for all translations to load before rendering
