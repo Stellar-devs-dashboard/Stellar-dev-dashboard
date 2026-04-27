@@ -1,5 +1,6 @@
 import React from 'react'
 import { useStore } from '../../lib/store'
+import { usePluginTabs } from '../../plugins'
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: '◈' },
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { activeTab, setActiveTab, network, setNetwork, connectedAddress } = useStore()
+  const pluginTabs = usePluginTabs()
 
   return (
     <aside style={{
@@ -121,6 +123,57 @@ export default function Sidebar() {
             >
               <span style={{ fontSize: '16px', opacity: 0.9 }}>{item.icon}</span>
               {item.label}
+              {isActive && (
+                <span style={{
+                  marginLeft: 'auto',
+                  width: '5px', height: '5px',
+                  borderRadius: '50%',
+                  background: 'var(--cyan)',
+                  boxShadow: '0 0 6px var(--cyan)',
+                }} />
+              )}
+            </button>
+          )
+        })}
+        {pluginTabs.map((item, index) => {
+          const isActive = activeTab === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                padding: '9px 12px',
+                marginBottom: '2px',
+                background: isActive ? 'var(--cyan-glow)' : 'transparent',
+                border: `1px solid ${isActive ? 'var(--cyan-dim)' : 'transparent'}`,
+                borderRadius: 'var(--radius-md)',
+                color: isActive ? 'var(--cyan)' : 'var(--text-secondary)',
+                fontSize: '13px',
+                fontFamily: 'var(--font-mono)',
+                cursor: 'pointer',
+                transition: 'var(--transition)',
+                textAlign: 'left',
+                animationDelay: `${(NAV_ITEMS.length + index) * 0.04}s`,
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'var(--bg-hover)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }
+              }}
+            >
+              <span style={{ fontSize: '16px', opacity: 0.7 }}>★</span>
+              {item.name}
               {isActive && (
                 <span style={{
                   marginLeft: 'auto',

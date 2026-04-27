@@ -84,4 +84,12 @@ export const useStore = create((set, get) => ({
     newErrors[index] = error
     return { comparisonErrors: newErrors }
   }),
+
+  // Prices
+  xlmPrice: null,
+  assetPrices: {},
+  setXLMPrice: (price) => set({ xlmPrice: price }),
+  setAssetPrice: (key, price) => set((state) => ({
+    assetPrices: { ...state.assetPrices, [key]: price }
+  })),
 }))

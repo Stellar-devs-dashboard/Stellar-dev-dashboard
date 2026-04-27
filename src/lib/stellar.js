@@ -218,4 +218,35 @@ export async function exportTransactionXDR(params) {
   return transaction.toXDR()
 }
 
+export async function fetchXLMPrice() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd')
+    const data = await res.json()
+    return data.stellar.usd
+  } catch (e) {
+    console.error('Failed to fetch XLM price:', e)
+    return null
+  }
+}
+
+export async function fetchAssetPrice(assetCode, assetIssuer, network = 'testnet') {
+  const server = getServer(network)
+  try {
+    const asset = new StellarSdk.Asset(assetCode, assetIssuer)
+    const native = StellarSdk.Asset.native()
+
+    // Check orderbook: buy XLM by selling the Asset
+    // In SDK orderbook(buying, selling)
+    const orderbook = await server.orderbook(native, asset).call()
+
+    if (orderbook.bids && orderbook.bids.length > 0) {
+      return parseFloat(orderbook.bids[0].price)
+    }
+    return null
+  } catch (e) {
+    // Gracefully handle assets with no market
+    return null
+  }
+}
+
 export { StellarSdk }

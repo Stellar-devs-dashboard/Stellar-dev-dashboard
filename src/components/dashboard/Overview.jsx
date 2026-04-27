@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useStore } from '../../lib/store'
-import { fetchNetworkStats, formatXLM, shortAddress } from '../../lib/stellar'
+import { fetchNetworkStats, formatXLM, shortAddress, fetchXLMPrice, fetchAssetPrice } from '../../lib/stellar'
+import { usePluginWidgets } from '../../plugins'
 import { StatCard } from './Card'
 import { format } from 'date-fns'
 
@@ -9,20 +10,38 @@ export default function Overview() {
     accountData, transactions, operations, network,
     networkStats, setNetworkStats, statsLoading, setStatsLoading,
     connectedAddress, txLoading, opsLoading,
+    xlmPrice, setXLMPrice, assetPrices, setAssetPrice
   } = useStore()
 
   useEffect(() => {
     setStatsLoading(true)
     fetchNetworkStats(network)
       .then(s => setNetworkStats(s))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setStatsLoading(false))
-  }, [network])
+
+    // Refresh XLM price
+    fetchXLMPrice().then(setXLMPrice)
+  }, [network, setNetworkStats, setStatsLoading, setXLMPrice])
+
+  useEffect(() => {
+    // Refresh asset prices
+    if (accountData?.balances) {
+      accountData.balances.forEach(asset => {
+        if (asset.asset_type !== 'native') {
+          const key = `${asset.asset_code}:${asset.asset_issuer}`
+          fetchAssetPrice(asset.asset_code, asset.asset_issuer, network)
+            .then(price => setAssetPrice(key, price))
+        }
+      })
+    }
+  }, [accountData, network, setAssetPrice])
 
   const xlmBalance = accountData?.balances?.find(b => b.asset_type === 'native')
   const otherAssets = accountData?.balances?.filter(b => b.asset_type !== 'native') || []
   const ledger = networkStats?.latestLedger
   const feeStats = networkStats?.feeStats
+  const pluginWidgets = usePluginWidgets('overview')
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -57,7 +76,7 @@ export default function Overview() {
         <StatCard
           label="XLM Balance"
           value={xlmBalance ? formatXLM(xlmBalance.balance) : '—'}
-          sub="lumens"
+          sub={xlmPrice && xlmBalance ? `≈ $${(parseFloat(xlmBalance.balance) * xlmPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} est.` : "lumens"}
           accent="var(--cyan)"
         />
         <StatCard
@@ -100,8 +119,8 @@ export default function Overview() {
                 borderBottom: i < otherAssets.length - 1 ? '1px solid var(--border)' : 'none',
                 transition: 'var(--transition)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <div>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -113,9 +132,23 @@ export default function Overview() {
                     </span>
                   )}
                 </div>
-                <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>
-                  {formatXLM(asset.balance)}
-                </span>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>
+                    {formatXLM(asset.balance)}
+                  </div>
+                  {(() => {
+                    const priceInXlm = assetPrices[`${asset.asset_code}:${asset.asset_issuer}`]
+                    if (priceInXlm && xlmPrice) {
+                      const usdVal = parseFloat(asset.balance) * priceInXlm * xlmPrice
+                      return (
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          ≈ ${usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} est.
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
               </div>
             ))}
           </div>
@@ -146,8 +179,8 @@ export default function Overview() {
             borderBottom: i < 4 ? '1px solid var(--border)' : 'none',
             transition: 'var(--transition)',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
@@ -173,6 +206,19 @@ export default function Overview() {
           </div>
         ))}
       </div>
+
+      {pluginWidgets.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
+          {pluginWidgets.map((widget) => {
+            const WidgetComponent = widget.component
+            return (
+              <div key={widget.id} style={{ minWidth: 0 }}>
+                <WidgetComponent />
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Network stats */}
       <div>

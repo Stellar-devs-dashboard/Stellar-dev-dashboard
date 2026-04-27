@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useStore } from '../../lib/store'
 import { fetchNetworkStats, getServer, streamLedgers } from '../../lib/stellar'
+import { fetchValidatorStatus, fetchNetworkCongestion, fetchFeePredictions, fetchPerformanceMetrics } from '../../lib/networkMonitoring'
 import { format } from 'date-fns'
 import { StatCard } from './Card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -9,7 +10,12 @@ export default function Network() {
   const { network, networkStats, setNetworkStats, statsLoading, setStatsLoading } = useStore()
   const [recentLedgers, setRecentLedgers] = useState([])
   const [ledgersLoading, setLedgersLoading] = useState(false)
+  const [monitoringLoading, setMonitoringLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [validatorStatus, setValidatorStatus] = useState(null)
+  const [congestion, setCongestion] = useState(null)
+  const [feePrediction, setFeePrediction] = useState(null)
+  const [performance, setPerformance] = useState(null)
 
   // Calculate ledger close intervals for chart
   const chartData = useMemo(() => {
@@ -47,37 +53,53 @@ export default function Network() {
   useEffect(() => {
     setStatsLoading(true)
     setLedgersLoading(true)
+    setMonitoringLoading(true)
 
     // Initial fetch
     fetchNetworkStats(network)
-      .then(s => setNetworkStats(s))
+      .then((s) => setNetworkStats(s))
       .catch(() => { })
       .finally(() => setStatsLoading(false))
 
     getServer(network).ledgers().order('desc').limit(20).call()
-      .then(r => setRecentLedgers(r.records))
+      .then((r) => setRecentLedgers(r.records))
       .catch(() => { })
       .finally(() => setLedgersLoading(false))
+
+    Promise.all([
+      fetchValidatorStatus(network),
+      fetchNetworkCongestion(network),
+      fetchFeePredictions(network),
+      fetchPerformanceMetrics(network),
+    ])
+      .then(([validator, congestionData, feePredictionData, performanceData]) => {
+        setValidatorStatus(validator)
+        setCongestion(congestionData)
+        setFeePrediction(feePredictionData)
+        setPerformance(performanceData)
+      })
+      .catch(() => { })
+      .finally(() => setMonitoringLoading(false))
 
     // Set up streaming
     let closeStream = null
     try {
       closeStream = streamLedgers((newLedger) => {
         setIsStreaming(true)
-        setRecentLedgers(prev => {
-          if (prev.some(l => l.sequence === newLedger.sequence)) return prev
+        setRecentLedgers((prev) => {
+          if (prev.some((l) => l.sequence === newLedger.sequence)) return prev
           return [newLedger, ...prev.slice(0, 19)]
         })
 
         // Update latest ledger immediately for instant UI feedback
-        setNetworkStats(prev => ({
+        setNetworkStats((prev) => ({
           ...prev,
-          latestLedger: newLedger
+          latestLedger: newLedger,
         }))
 
         // Refresh full stats to ensure fee stats and other data stay current
         fetchNetworkStats(network)
-          .then(s => setNetworkStats(s))
+          .then((s) => setNetworkStats(s))
           .catch(() => { })
       }, network)
     } catch (e) {
@@ -132,6 +154,37 @@ export default function Network() {
         <StatCard label="Tx Count" value={ledger?.successful_transaction_count?.toLocaleString()} sub="successful in last ledger" loading={statsLoading} accent="var(--green)" />
         <StatCard label="Failed Tx" value={ledger?.failed_transaction_count?.toLocaleString()} sub="failed in last ledger" loading={statsLoading} accent="var(--red)" />
         <StatCard label="Op Count" value={ledger?.operation_count?.toLocaleString()} sub="in last ledger" loading={statsLoading} accent="var(--amber)" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+        <StatCard
+          label="Validator Status"
+          value={validatorStatus?.healthy ? 'Healthy' : 'Degraded'}
+          sub={validatorStatus?.message}
+          loading={monitoringLoading}
+          accent={validatorStatus?.healthy ? 'var(--green)' : 'var(--red)'}
+        />
+        <StatCard
+          label="Congestion"
+          value={congestion?.level || '—'}
+          sub={congestion?.range ? `${Math.round((congestion.load || 0) * 100)}% load · ${congestion.range} ops` : '—'}
+          loading={monitoringLoading}
+          accent={congestion?.level === 'High' ? 'var(--red)' : congestion?.level === 'Moderate' ? 'var(--amber)' : 'var(--green)'}
+        />
+        <StatCard
+          label="Fee Prediction"
+          value={feePrediction?.medium ? `${feePrediction.medium} stroops` : '—'}
+          sub={feePrediction?.high ? `Low ${feePrediction.low} · High ${feePrediction.high}` : '—'}
+          loading={monitoringLoading}
+          accent="var(--cyan)"
+        />
+        <StatCard
+          label="Performance"
+          value={performance?.txPerSecond ? `${performance.txPerSecond.toFixed(2)} tx/s` : '—'}
+          sub={performance?.opsPerSecond ? `${performance.opsPerSecond.toFixed(2)} ops/s` : '—'}
+          loading={monitoringLoading}
+          accent="var(--text-secondary)"
+        />
       </div>
 
       {/* Fee Stats */}

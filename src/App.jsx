@@ -9,6 +9,8 @@ import NetworkStats from './components/dashboard/NetworkStats'
 import Faucet from './components/dashboard/Faucet'
 import Builder from './components/dashboard/Builder'
 import Compare from './components/dashboard/Compare'
+import { PluginProvider, usePluginTabs } from './plugins'
+import { samplePlugin } from './plugins'
 import { useStore } from './lib/store'
 
 const TABS = {
@@ -22,10 +24,11 @@ const TABS = {
   compare: Compare,
 }
 
-export default function App() {
+function AppShell() {
   const { connectedAddress, activeTab } = useStore()
-
-  const ActiveComponent = TABS[activeTab] || Overview
+  const pluginTabs = usePluginTabs()
+  const pluginTabMap = pluginTabs.reduce((map, tab) => ({ ...map, [tab.id]: tab.component }), {})
+  const ActiveComponent = pluginTabMap[activeTab] || TABS[activeTab] || Overview
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
@@ -44,5 +47,13 @@ export default function App() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <PluginProvider initialPlugins={[samplePlugin]}>
+      <AppShell />
+    </PluginProvider>
   )
 }
