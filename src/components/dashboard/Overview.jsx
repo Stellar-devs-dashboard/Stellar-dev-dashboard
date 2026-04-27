@@ -45,31 +45,41 @@ export default function Overview() {
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700 }}>
-            Overview
+      <div style={{ 
+        display: 'flex', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        justifyContent: 'space-between',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? '16px' : '0'
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ 
+            fontFamily: 'var(--font-display)', 
+            fontSize: isMobile ? '20px' : '22px', 
+            fontWeight: 700,
+            marginBottom: '4px'
+          }}>
+            Dashboard Overview
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+          <CopyableValue
+            value={connectedAddress}
+            title="Copy connected public key"
+            containerStyle={{ 
+              fontSize: '12px', 
+              color: 'var(--text-muted)', 
+              fontFamily: 'var(--font-mono)' 
+            }}
+            textStyle={{ 
+              maxWidth: isMobile ? '200px' : '260px', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis', 
+              whiteSpace: 'nowrap' 
+            }}
+          >
             {shortAddress(connectedAddress, 8)}
-          </div>
+          </CopyableValue>
         </div>
-        <div style={{
-          padding: '6px 12px',
-          background: network === 'testnet' ? 'var(--amber-glow)' : 'var(--green-glow)',
-          border: `1px solid ${network === 'testnet' ? 'var(--amber)' : 'var(--green)'}`,
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '11px',
-          color: network === 'testnet' ? 'var(--amber)' : 'var(--green)',
-          fontFamily: 'var(--font-mono)',
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-        }}>
-          {network}
-        </div>
-      </div>
 
       {/* Account Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
@@ -106,18 +116,82 @@ export default function Overview() {
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
         }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
-            Asset Holdings
+          {/* Network Badge */}
+          <div style={{
+            padding: '6px 12px',
+            background: network === 'testnet' ? 'var(--amber-glow)' : 'var(--green-glow)',
+            border: `1px solid ${network === 'testnet' ? 'var(--amber)' : 'var(--green)'}`,
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '11px',
+            color: network === 'testnet' ? 'var(--amber)' : 'var(--green)',
+            fontFamily: 'var(--font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}>
+            {network}
           </div>
-          <div style={{ padding: '4px 0' }}>
-            {otherAssets.map((asset, i) => (
-              <div key={i} style={{
+
+          {/* Dashboard Controls */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {isEditing && (
+              <button
+                onClick={() => setShowWidgetSelector(true)}
+                style={{
+                  padding: '8px 12px',
+                  background: 'var(--cyan)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                title="Add widget"
+              >
+                <span>+</span>
+                {!isMobile && 'Add Widget'}
+              </button>
+            )}
+
+            {isEditing && (
+              <button
+                onClick={handleResetLayout}
+                style={{
+                  padding: '8px 12px',
+                  background: 'var(--amber)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
+                title="Reset to default layout"
+              >
+                {isMobile ? '↺' : 'Reset'}
+              </button>
+            )}
+
+            <button
+              onClick={toggleEditMode}
+              style={{
+                padding: '8px 12px',
+                background: isEditing ? 'var(--green)' : 'var(--bg-elevated)',
+                color: isEditing ? 'white' : 'var(--text-primary)',
+                border: `1px solid ${isEditing ? 'var(--green)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'var(--transition)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 18px',
-                borderBottom: i < otherAssets.length - 1 ? '1px solid var(--border)' : 'none',
-                transition: 'var(--transition)',
+                gap: '6px'
               }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -201,10 +275,11 @@ export default function Overview() {
               rel="noopener noreferrer"
               style={{ fontSize: '11px', color: 'var(--cyan)', flexShrink: 0 }}
             >
-              ↗
-            </a>
+              <span>{isEditing ? '✓' : '✏️'}</span>
+              {!isMobile && (isEditing ? 'Done' : 'Edit')}
+            </button>
           </div>
-        ))}
+        </div>
       </div>
 
       {pluginWidgets.length > 0 && (
@@ -244,8 +319,27 @@ export default function Overview() {
             accent="var(--text-secondary)"
           />
         </div>
-      </div>
+      )}
 
+      {/* Dashboard Grid */}
+      <DashboardGrid
+        widgets={widgets}
+        onLayoutChange={handleLayoutChange}
+        onWidgetResize={handleWidgetResize}
+        onWidgetRemove={handleWidgetRemove}
+        editable={isEditing}
+        columns={getColumns()}
+        gap={isMobile ? 12 : 16}
+        minWidgetHeight={200}
+      />
+
+      {/* Widget Selector Modal */}
+      <WidgetSelector
+        isOpen={showWidgetSelector}
+        onClose={() => setShowWidgetSelector(false)}
+        onAddWidget={handleAddWidget}
+        existingWidgets={widgets}
+      />
     </div>
-  )
+  );
 }

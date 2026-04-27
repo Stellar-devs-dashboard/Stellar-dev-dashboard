@@ -22,7 +22,19 @@ const TABS = {
   builder: Builder,
   faucet: Faucet,
   compare: Compare,
-}
+  wallet: WalletConnect,
+  signer: TransactionSigner,
+  portfolio: PortfolioValue,
+  txBuilder: TransactionBuilder,
+  contractInteraction: ContractInteraction,
+  contractABI: ContractABI,
+  dex: DEXExplorer,
+  explorers: ExplorerEmbed,
+  realtime: RealTimeLedger,
+  charts: ChartsTab,
+  assets: AssetDiscovery,
+  multisig: MultisigManager,
+};
 
 function AppShell() {
   const { connectedAddress, activeTab } = useStore()
@@ -31,23 +43,37 @@ function AppShell() {
   const ActiveComponent = pluginTabMap[activeTab] || TABS[activeTab] || Overview
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <Sidebar />
-      <main style={{
-        marginLeft: '220px',
-        flex: 1,
-        padding: '32px 36px',
-        maxWidth: '1100px',
-        width: '100%',
-      }}>
-        {!connectedAddress ? (
-          <ConnectPanel />
-        ) : (
-          <ActiveComponent />
-        )}
-      </main>
-    </div>
-  )
+    <ErrorBoundary onRetry={handleRetry} maxRetries={3}>
+      <div
+        style={{
+          display: "flex",
+          minHeight: "100vh",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {isMobile && <MobileHeader />}
+        <Sidebar isMobile={isMobile} />
+        <main style={getMainStyles()}>
+          <div style={{ marginBottom: "16px" }}>
+            <PriceTicker />
+          </div>
+          <ErrorBoundary onRetry={handleRetry} maxRetries={2}>
+            {!connectedAddress ? <ConnectPanel /> : <ActiveComponent />}
+          </ErrorBoundary>
+        </main>
+        <TourLauncher />
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+export default function App() {
+  return (
+    <I18nProvider>
+      <DashboardLayout />
+    </I18nProvider>
+  );
 }
 
 export default function App() {

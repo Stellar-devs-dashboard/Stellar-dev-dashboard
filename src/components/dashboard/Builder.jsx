@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useStore } from '../../lib/store'
 import { buildTransaction, simulateTransaction, exportTransactionXDR } from '../../lib/stellar'
+import AdvancedTransactionSimulation from './AdvancedTransactionSimulation'
 import { StatCard } from './Card'
 import { Plus, Trash2, Play, Copy, AlertCircle, CheckCircle } from 'lucide-react'
 
@@ -20,6 +21,14 @@ export default function Builder() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const transactionParams = {
+    sourceAccount,
+    operations,
+    memo,
+    baseFee: parseInt(baseFee || '100', 10),
+    timeBounds,
+    network,
+  }
 
   // Reset transaction when network changes
   useEffect(() => {
@@ -428,6 +437,8 @@ export default function Builder() {
           </div>
         </div>
       )}
+
+      <AdvancedTransactionSimulation transactionParams={transactionParams} />
     </div>
   )
 }

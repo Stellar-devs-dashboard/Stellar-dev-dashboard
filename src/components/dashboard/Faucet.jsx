@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useStore } from '../../lib/store'
 import { fundTestnetAccount, isValidPublicKey } from '../../lib/stellar'
+import CopyableValue from './CopyableValue'
 
 export default function Faucet() {
   const { connectedAddress, faucetLoading, setFaucetLoading, faucetResult, setFaucetResult } = useStore()
@@ -129,9 +130,14 @@ export default function Faucet() {
             {faucetResult.success ? (
               <>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Address funded:</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: '14px' }}>
+                <CopyableValue
+                  value={faucetResult.address}
+                  title="Copy funded public key"
+                  containerStyle={{ fontSize: '13px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: '14px' }}
+                  textStyle={{ display: 'inline-block' }}
+                >
                   {faucetResult.address}
-                </div>
+                </CopyableValue>
                 <div style={{ fontSize: '12px', color: 'var(--green)' }}>
                   ✓ 10,000 XLM added to account on testnet
                 </div>

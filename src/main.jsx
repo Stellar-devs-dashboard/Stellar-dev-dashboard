@@ -1,10 +1,14 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './styles/globals.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import "./styles/globals.css";
+import { initPerformanceMonitoring } from "./lib/performanceMonitoring";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// Initialize performance monitoring
+initPerformanceMonitoring();
+
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);

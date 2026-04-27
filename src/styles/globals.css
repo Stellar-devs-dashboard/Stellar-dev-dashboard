@@ -37,12 +37,51 @@
   --radius-lg: 12px;
 
   --transition: 180ms ease;
+
+  /* Responsive design tokens */
+  --sidebar-width: 220px;
+  --sidebar-width-mobile: 280px;
+  --header-height: 60px;
+  --content-padding: 36px;
+  --content-padding-tablet: 24px;
+  --content-padding-mobile: 16px;
+  
+  /* Touch targets */
+  --touch-target: 44px;
+  --touch-target-sm: 36px;
+  
+  /* Breakpoints (used in JS) */
+  --bp-mobile: 768px;
+  --bp-tablet: 1024px;
+  --bp-desktop: 1200px;
+}
+
+[data-theme="light"] {
+  --bg-base: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-hover: #e2e8f0;
+
+  --border: #cbd5e1;
+  --border-bright: #94a3b8;
+
+  --cyan: #0284c7;
+  --cyan-dim: #0369a1;
+  --cyan-glow: rgba(2, 132, 199, 0.15);
+  --cyan-glow-sm: rgba(2, 132, 199, 0.08);
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-accent: var(--cyan);
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
 }
 
 html {
@@ -130,3 +169,661 @@ body::before {
 button { cursor: pointer; font-family: inherit; }
 input  { font-family: var(--font-mono); }
 a { color: inherit; text-decoration: none; }
+
+/* Responsive utilities */
+.mobile-only { display: none; }
+.desktop-only { display: block; }
+
+/* Mobile menu overlay */
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition), visibility var(--transition);
+}
+
+.mobile-menu-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Touch-friendly buttons */
+@media (hover: none) and (pointer: coarse) {
+  button {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+  
+  .touch-target {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .touch-target-sm {
+    min-height: var(--touch-target-sm);
+    min-width: var(--touch-target-sm);
+  }
+  
+  /* Remove hover effects on touch devices */
+  button:hover {
+    background: initial;
+    color: initial;
+  }
+  
+  /* Add active states for better touch feedback */
+  button:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Better tap highlights */
+  * {
+    -webkit-tap-highlight-color: var(--cyan-glow);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Allow text selection in inputs and content areas */
+  input, textarea, [contenteditable], .selectable {
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Mobile-specific component styles */
+.mobile-card {
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.mobile-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.mobile-button-group button {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.mobile-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px; /* Prevents zoom on iOS */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.mobile-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mobile-table td {
+  display: block;
+  text-align: left;
+  border: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-table tr {
+  display: block;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.mobile-table td:first-child {
+  font-weight: 600;
+  color: var(--text-accent);
+  border-bottom: 1px solid var(--border-bright);
+}
+
+/* Responsive layout utilities */
+.responsive-grid {
+  display: grid;
+  width: 100%;
+}
+
+.responsive-flex {
+  display: flex;
+  width: 100%;
+}
+
+.mobile-layout {
+  /* Mobile-specific layout adjustments */
+}
+
+.tablet-layout {
+  /* Tablet-specific layout adjustments */
+}
+
+/* Mobile navigation improvements */
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--transition);
+}
+
+.mobile-nav-item:active {
+  background: var(--bg-hover);
+}
+
+.mobile-nav-icon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+}
+
+/* Improved mobile forms */
+.mobile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mobile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Mobile-friendly modals */
+.mobile-modal {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 20px;
+  transform: translateY(100%);
+  transition: transform var(--transition);
+  z-index: 1001;
+}
+
+.mobile-modal.open {
+  transform: translateY(0);
+}
+
+.mobile-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mobile-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1024px) {
+  html {
+    font-size: 13px;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+  
+  /* Adjust card layouts for tablet */
+  .card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  
+  /* Smaller buttons on tablet */
+  button {
+    padding: 8px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 12px;
+  }
+  
+  .mobile-only {
+    display: block;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+  
+  /* Reduce grid background on mobile */
+  body::before {
+    background-size: 20px 20px;
+    opacity: 0.15;
+  }
+  
+  /* Adjust animations for mobile */
+  .animate-in {
+    animation-duration: 0.25s;
+  }
+  
+  /* Better touch scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Mobile-specific layouts */
+  .card-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  /* Stack elements vertically on mobile */
+  .flex-row-mobile-col {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  /* Full width buttons on mobile */
+  .btn-mobile-full {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Larger text inputs on mobile */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+  }
+  
+  /* Better spacing for mobile */
+  .mobile-spacing {
+    margin: 8px 0;
+  }
+  
+  /* Hide complex charts on very small screens */
+  .chart-container {
+    min-height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 11px;
+  }
+  
+  /* Further reduce grid on small screens */
+  body::before {
+    background-size: 15px 15px;
+    opacity: 0.1;
+  }
+  
+  /* Even more compact spacing */
+  .card-grid {
+    gap: 8px;
+  }
+  
+  /* Smaller chart heights on very small screens */
+  .chart-container {
+    min-height: 150px;
+  }
+  
+  /* Compact table layouts */
+  table {
+    font-size: 10px;
+  }
+  
+  /* Stack table cells on very small screens */
+  .table-mobile-stack td {
+    display: block;
+    text-align: left;
+    border: none;
+    padding: 4px 8px;
+  }
+  
+  .table-mobile-stack tr {
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* Landscape phone optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  .mobile-landscape-hide {
+    display: none;
+  }
+  
+  /* Reduce header height in landscape */
+  :root {
+    --header-height: 50px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Sharper borders on high DPI */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Widget System Styles */
+.dashboard-grid {
+  position: relative;
+}
+
+.widget-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.widget-container:hover .widget-controls {
+  opacity: 1 !important;
+}
+
+.widget-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.widget-controls button {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: var(--transition);
+}
+
+.widget-controls button:hover {
+  transform: scale(1.1);
+}
+
+/* Widget drag and drop states */
+.widget-container[draggable="true"] {
+  cursor: move;
+}
+
+.widget-container[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Widget resize handle */
+.widget-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+  background: linear-gradient(-45deg, transparent 30%, var(--border) 30%, var(--border) 70%, transparent 70%);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.widget-container:hover .widget-resize-handle {
+  opacity: 0.5;
+}
+
+.widget-resize-handle:hover {
+  opacity: 1 !important;
+}
+
+/* Widget animations */
+@keyframes widget-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.widget-container {
+  animation: widget-appear 0.3s ease-out;
+}
+
+/* Widget loading states */
+.widget-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.widget-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg-card);
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Widget error states */
+.widget-error {
+  border-color: var(--red);
+  background: var(--red-glow);
+}
+
+/* Responsive widget adjustments */
+@media (max-width: 768px) {
+  .widget-controls {
+    opacity: 1; /* Always show on mobile */
+  }
+  
+  .widget-controls button {
+    width: var(--touch-target);
+    height: var(--touch-target);
+    font-size: 12px;
+  }
+  
+  .dashboard-grid {
+    gap: 12px;
+  }
+}
+
+/* Widget selector modal animations */
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.widget-selector-modal {
+  animation: modal-appear 0.2s ease-out;
+}
+
+/* Widget category tabs */
+.widget-category-tab {
+  transition: all var(--transition);
+}
+
+.widget-category-tab:hover {
+  transform: translateY(-1px);
+}
+
+.widget-category-tab.active {
+  box-shadow: 0 2px 8px var(--cyan-glow);
+}
+
+/* Widget grid item hover effects */
+.widget-grid-item {
+  transition: all var(--transition);
+}
+
+.widget-grid-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth scrolling for widget content */
+.widget-base {
+  scroll-behavior: smooth;
+}
+
+.widget-base::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget-base::-webkit-scrollbar-track {
+  background: var(--bg-elevated);
+  border-radius: 3px;
+}
+
+.widget-base::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.widget-base::-webkit-scrollbar-thumb:hover {
+  background: var(--border-bright);
+}
+
+/* ── Mobile-first responsive additions (#110) ────────────────────────────── */
+
+/* Safe-area insets for notched/island devices */
+@supports (padding: env(safe-area-inset-top)) {
+  .mobile-safe-top    { padding-top:    env(safe-area-inset-top); }
+  .mobile-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .mobile-safe-left   { padding-left:   env(safe-area-inset-left); }
+  .mobile-safe-right  { padding-right:  env(safe-area-inset-right); }
+}
+
+/* Responsive layout helpers */
+.stack-on-mobile { display: flex; flex-direction: row; gap: 12px; }
+
+@media (max-width: 768px) {
+  .stack-on-mobile {
+    flex-direction: column;
+  }
+
+  /* Tighten content padding on small screens */
+  .dashboard-content {
+    padding: var(--content-padding-mobile) !important;
+  }
+
+  /* Full-width cards on mobile */
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Increase touch targets */
+  button, a, [role="button"] {
+    min-height: var(--touch-target);
+  }
+
+  /* Hide desktop-only sidebar; show hamburger */
+  .desktop-sidebar { display: none !important; }
+  .mobile-header   { display: flex !important; }
+
+  /* Allow tables to scroll horizontally */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust font sizes for readability */
+  body { font-size: 14px; }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .dashboard-content {
+    padding: var(--content-padding-tablet) !important;
+  }
+
+  /* Two-column grid on tablet */
+  .card-grid-auto {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* PWA standalone display adjustments */
+@media (display-mode: standalone) {
+  /* Add extra top padding for devices that need it in standalone mode */
+  .app-root {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Reduced-motion: disable all transitions and animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High-contrast mode support */
+@media (forced-colors: active) {
+  :root {
+    --cyan: ButtonText;
+    --border: ButtonBorder;
+    --text-primary: CanvasText;
+    --bg-card: Canvas;
+  }
+}
