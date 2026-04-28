@@ -34,6 +34,12 @@ const TABS = {
   charts: ChartsTab,
   assets: AssetDiscovery,
   multisig: MultisigManager,
+  analytics: Analytics,
+  systemHealth: SystemHealth,
+  settings: Settings,
+  audit: AuditLog,
+  anchors: AnchorIntegration,
+  search: AdvancedSearch,
 };
 
 function AppShell() {
@@ -41,6 +47,19 @@ function AppShell() {
   const pluginTabs = usePluginTabs()
   const pluginTabMap = pluginTabs.reduce((map, tab) => ({ ...map, [tab.id]: tab.component }), {})
   const ActiveComponent = pluginTabMap[activeTab] || TABS[activeTab] || Overview
+
+  const handleSearchResult = (result) => {
+    if (!result) return;
+    if (result.type === "transaction" || result.type === "operation") {
+      setActiveTab("transactions");
+      return;
+    }
+    if (result.type === "account") {
+      setActiveTab("account");
+      return;
+    }
+    setActiveTab("overview");
+  };
 
   return (
     <ErrorBoundary onRetry={handleRetry} maxRetries={3}>
@@ -55,6 +74,9 @@ function AppShell() {
         {isMobile && <MobileHeader />}
         <Sidebar isMobile={isMobile} />
         <main style={getMainStyles()}>
+          <div style={{ marginBottom: "12px" }}>
+            <SearchBar onSelectResult={handleSearchResult} />
+          </div>
           <div style={{ marginBottom: "16px" }}>
             <PriceTicker />
           </div>

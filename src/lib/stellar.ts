@@ -1,5 +1,7 @@
 import * as StellarSdk from '@stellar/stellar-sdk'
 import { Cache, TTL } from './cache.js'
+import { rateLimiter } from './rateLimiter.js'
+import auditTrail from './auditTrail.js'
 
 // ─── Cache setup ──────────────────────────────────────────────────────────────
 
@@ -58,6 +60,50 @@ export const NETWORKS: Record<NetworkName, NetworkConfig> = {
 }
 
 const COINGECKO_XLM_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd'
+
+// ─── Rate Limited Fetch Wrapper ───────────────────────────────────────────────
+
+async function rateLimitedFetch(url: string, options?: RequestInit, priority: 'high' | 'medium' | 'low' = 'medium'): Promise<Response> {
+  const startTime = Date.now()
+  
+  try {
+    // Log the API call
+    auditTrail.logAPICall(url, options?.method || 'GET', options, {})
+    
+    // Check rate limits first
+    const check = rateLimiter.checkRequest('stellar_client', rateLimiter.extractEndpoint(url))
+    
+    if (!check.allowed) {
+      // Queue the request if rate limited
+      const response = await rateLimiter.queueRequest({ url, options, priority }, 'stellar_client')
+      const responseTime = Date.now() - startTime
+      
+      auditTrail.logAPICall(url, options?.method || 'GET', options, { 
+        status: response.status,
+        responseTime,
+        queued: true
+      })
+      
+      return response
+    }
+    
+    // Execute request immediately if allowed
+    const response = await fetch(url, options)
+    const responseTime = Date.now() - startTime
+    
+    auditTrail.logAPICall(url, options?.method || 'GET', options, { 
+      status: response.status,
+      responseTime,
+      queued: false
+    })
+    
+    return response
+    
+  } catch (error) {
+    auditTrail.logError(error as Error, { url, options, operation: 'rateLimitedFetch' })
+    throw error
+  }
+}
 
 // ─── Servers ──────────────────────────────────────────────────────────────────
 

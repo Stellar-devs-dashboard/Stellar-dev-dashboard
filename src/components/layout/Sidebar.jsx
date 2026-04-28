@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { id: 'transactions', label: 'Transactions', icon: '⇄' },
   { id: 'contracts', label: 'Contracts', icon: '◻' },
   { id: 'assets', label: 'Assets', icon: '💎' },
+  { id: 'anchors', label: 'Anchors', icon: '⚓' },
+  { id: 'search', label: 'Search', icon: '🔍' },
   { id: 'network', label: 'Network', icon: '◎' },
   { id: 'realtime', label: 'Real-Time', icon: '◉' },
   { id: 'builder', label: 'Builder', icon: '⚒' },
@@ -18,6 +20,10 @@ const NAV_ITEMS = [
   { id: 'multisig', label: 'Multisig', icon: '⊕' },
   { id: 'portfolio', label: 'Portfolio', icon: '◐' },
   { id: 'charts', label: 'Charts', icon: '▤' },
+  { id: 'analytics', label: 'Analytics', icon: '◍' },
+  { id: 'systemHealth', label: 'Health', icon: '⚕' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
+  { id: 'audit', label: 'Audit', icon: '⊟' },
 ]
 
 export default function Sidebar() {
