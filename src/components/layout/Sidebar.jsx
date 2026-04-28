@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { id: 'analytics', label: 'Analytics', icon: '◍' },
   { id: 'systemHealth', label: 'Health', icon: '⚕' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
+  { id: 'audit', label: 'Audit', icon: '⊟' },
 ]
 
 export default function Sidebar({ isMobile = false }) {
