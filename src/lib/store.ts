@@ -100,6 +100,14 @@ export interface StoreState {
   // Error state (#144)
   globalError: { message: string; category: string } | null
   setGlobalError: (err: { message: string; category: string } | null) => void
+
+  // Price feed state
+  prices: Record<string, { usd: number | null; usd_24h_change: number | null }>
+  pricesLoading: boolean
+  pricesError: string | null
+  setPrices: (prices: Record<string, { usd: number | null; usd_24h_change: number | null }>) => void
+  setPricesLoading: (loading: boolean) => void
+  setPricesError: (error: string | null) => void
 }
 
 // ─── Persisted keys ───────────────────────────────────────────────────────────
@@ -222,6 +230,14 @@ export const useStore = create<StoreState>((set, get) => ({
   // Error state (#144)
   globalError: null,
   setGlobalError: (err) => set({ globalError: err }),
+
+  // Price feed state
+  prices: {},
+  pricesLoading: false,
+  pricesError: null,
+  setPrices: (prices) => set({ prices, pricesError: null }),
+  setPricesLoading: (loading) => set({ pricesLoading: loading }),
+  setPricesError: (error) => set({ pricesError: error }),
 }))
 
 // ─── Persistence middleware ───────────────────────────────────────────────────
