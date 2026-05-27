@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useSettings } from "../../hooks/useSettings";
 import { useStore } from "../../lib/store";
 import { getEnvironmentConfig } from "../../lib/config";
+import { getCustomNetworkAuthHeaders, updateCustomNetworkConfig } from "../../lib/stellar";
 
 function FieldLabel({ children }) {
   return (
@@ -12,6 +13,8 @@ function FieldLabel({ children }) {
 }
 
 export default function Settings() {
+  const initialCustomHeaders = getCustomNetworkAuthHeaders();
+  const initialHeaderName = Object.keys(initialCustomHeaders)[0] || "Authorization";
   const { network, setNetwork, theme, toggleTheme } = useStore();
   const {
     profiles,
@@ -26,12 +29,22 @@ export default function Settings() {
 
   const [profileName, setProfileName] = useState("");
   const [draftConfig, setDraftConfig] = useState(() => activeProfile.config);
+  const [customHeaderName, setCustomHeaderName] = useState(initialHeaderName);
+  const [customHeaderValue, setCustomHeaderValue] = useState(initialCustomHeaders[initialHeaderName] || "");
   const baseline = useMemo(() => getEnvironmentConfig(), []);
 
   function handleSaveProfile() {
     const name = profileName.trim() || activeProfileName;
     saveProfile(name, draftConfig);
     setProfileName("");
+  }
+
+  function updateCustomHeader(name, value) {
+    setCustomHeaderName(name);
+    setCustomHeaderValue(value);
+    updateCustomNetworkConfig({
+      headers: name.trim() && value.trim() ? { [name.trim()]: value.trim() } : {},
+    });
   }
 
   return (
@@ -204,6 +217,43 @@ export default function Settings() {
           >
             Save Profile
           </button>
+        </div>
+      </div>
+
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "14px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <FieldLabel>Custom Horizon Authentication</FieldLabel>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>
+            Header Name
+            <input
+              value={customHeaderName}
+              onChange={(event) => updateCustomHeader(event.target.value, customHeaderValue)}
+              placeholder="Authorization"
+              style={{
+                padding: "8px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>
+            Header Value
+            <input
+              type="password"
+              value={customHeaderValue}
+              onChange={(event) => updateCustomHeader(customHeaderName, event.target.value)}
+              placeholder="Bearer ..."
+              style={{
+                padding: "8px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </label>
         </div>
       </div>
     </div>

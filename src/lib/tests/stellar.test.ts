@@ -7,18 +7,29 @@
  * config lookup).
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import * as StellarSdk from '@stellar/stellar-sdk';
 
 import {
   NETWORKS,
   OPERATION_LABELS,
   formatXLM,
+  getCustomNetworkAuthHeaders,
   getNetworkDetails,
   getOperationLabel,
   shortAddress,
   updateCustomNetworkConfig,
 } from '../stellar';
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+  updateCustomNetworkConfig({
+    horizonUrl: '',
+    sorobanUrl: '',
+    passphrase: '',
+    headers: {},
+  });
+});
 
 describe('NETWORKS', () => {
   it('exposes mainnet, testnet, futurenet, local, and custom configs', () => {
@@ -54,6 +65,26 @@ describe('updateCustomNetworkConfig', () => {
     updateCustomNetworkConfig({ horizonUrl: 'http://example.invalid/horizon' });
     expect(NETWORKS.custom.horizonUrl).toBe('http://example.invalid/horizon');
     expect(NETWORKS.testnet).toEqual(before);
+  });
+
+  it('stores custom auth headers in session storage only', () => {
+    updateCustomNetworkConfig({
+      headers: { Authorization: 'Bearer secret-horizon-token' },
+    });
+
+    expect(getCustomNetworkAuthHeaders()).toEqual({
+      Authorization: 'Bearer secret-horizon-token',
+    });
+    expect(window.sessionStorage.getItem('stellar-custom-network-headers')).toContain('secret-horizon-token');
+    expect(window.localStorage.getItem('stellar-custom-network-headers')).toBeNull();
+  });
+
+  it('removes blank custom auth headers', () => {
+    updateCustomNetworkConfig({ headers: { Authorization: 'Bearer secret-horizon-token' } });
+    updateCustomNetworkConfig({ headers: { Authorization: '' } });
+
+    expect(getCustomNetworkAuthHeaders()).toEqual({});
+    expect(window.sessionStorage.getItem('stellar-custom-network-headers')).toBeNull();
   });
 });
 

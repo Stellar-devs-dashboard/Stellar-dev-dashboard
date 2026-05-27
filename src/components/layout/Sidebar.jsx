@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useStore } from '../../lib/store'
 import CopyableValue from '../dashboard/CopyableValue'
-import { NETWORKS, updateCustomNetworkConfig } from '../../lib/stellar'
+import { NETWORKS, getCustomNetworkAuthHeaders, updateCustomNetworkConfig } from '../../lib/stellar'
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: '◈' },
@@ -30,6 +30,10 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar({ isMobile = false }) {
+  const initialCustomHeaders = getCustomNetworkAuthHeaders()
+  const initialHeaderName = Object.keys(initialCustomHeaders)[0] || 'Authorization'
+  const [customHeaderName, setCustomHeaderName] = useState(initialHeaderName)
+  const [customHeaderValue, setCustomHeaderValue] = useState(initialCustomHeaders[initialHeaderName] || '')
   const { 
     activeTab, 
     setActiveTab, 
@@ -74,6 +78,14 @@ export default function Sidebar({ isMobile = false }) {
     borderRadius: 'var(--radius-sm)',
     color: 'var(--text-primary)',
     outline: 'none',
+  }
+
+  const updateCustomHeader = (name, value) => {
+    setCustomHeaderName(name)
+    setCustomHeaderValue(value)
+    updateCustomNetworkConfig({
+      headers: name.trim() && value.trim() ? { [name.trim()]: value.trim() } : {},
+    })
   }
 
   return (
@@ -190,6 +202,19 @@ export default function Sidebar({ isMobile = false }) {
                 defaultValue={NETWORKS.custom.passphrase}
                 style={customInputStyle}
                 onChange={(e) => updateCustomNetworkConfig({ passphrase: e.target.value.trim() })}
+              />
+              <input
+                placeholder="Auth Header Name"
+                value={customHeaderName}
+                style={customInputStyle}
+                onChange={(e) => updateCustomHeader(e.target.value, customHeaderValue)}
+              />
+              <input
+                placeholder="Auth Header Value (session only)"
+                type="password"
+                value={customHeaderValue}
+                style={customInputStyle}
+                onChange={(e) => updateCustomHeader(customHeaderName, e.target.value)}
               />
             </div>
           )}
