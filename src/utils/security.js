@@ -37,9 +37,9 @@ export function buildCspHeader(nonce) {
   return [
     `default-src 'self'`,
     `script-src 'self'${nonceAttr}`,
-    `style-src 'self' 'unsafe-inline'`,   // Tailwind requires inline styles
+    `style-src 'self'${nonceAttr}`,
     `img-src 'self' data: https:`,
-    `connect-src 'self' https://*.stellar.org https://horizon.stellar.org https://horizon-testnet.stellar.org wss:`,
+    `connect-src 'self' https://*.stellar.org https://api.coingecko.com`,
     `font-src 'self'`,
     `object-src 'none'`,
     `base-uri 'self'`,
