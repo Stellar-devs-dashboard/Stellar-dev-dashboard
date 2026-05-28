@@ -116,29 +116,65 @@ export function calculate24hPortfolioChange(portfolioItems) {
 }
 
 /**
- * Generate historical performance data points
- * (Simulated for demo - in production, fetch from API or store)
+ * Reconstructs historical running balances by parsing account effects backwards.
+ * Handles sequential page token parsing and network history truncation rules.
+ * @param {Object} server - Horizon server instance
+ * @param {string} accountId - Stellar account ID
+ * @param {Object} currentBalances - Current balances { assetCode: amount }
+ * @param {number} days - Timeline window (e.g. 30, 90)
+ * @returns {Array} Snapshot series
  */
-export function generateHistoricalPerformance(currentValue, days = 30) {
-  const data = []
-  const now = Date.now()
-  const dayMs = 24 * 60 * 60 * 1000
+export async function fetchHistoricalPerformance(server, accountId, currentBalances, days = 30) {
+  const endTime = Date.now();
+  const startTime = endTime - (days * 24 * 60 * 60 * 1000);
+  
+  let runningBalances = { ...currentBalances };
+  const history = [];
 
-  for (let i = days; i >= 0; i--) {
-    const timestamp = now - (i * dayMs)
-    // Simulate historical values with some volatility
-    const volatility = 0.02 // 2% daily volatility
-    const randomChange = (Math.random() - 0.5) * 2 * volatility
-    const value = currentValue * (1 + randomChange * i / days)
+  // Start with the latest snapshot
+  history.push({
+    timestamp: endTime,
+    balances: { ...runningBalances },
+    date: new Date(endTime).toISOString().split('T')[0]
+  });
 
-    data.push({
-      timestamp,
-      value: Math.max(0, value),
-      date: new Date(timestamp).toISOString().split('T')[0]
-    })
+  try {
+    // Sequential page parsing backwards
+    let page = await server.effects()
+      .forAccount(accountId)
+      .order('desc')
+      .limit(100)
+      .call();
+
+    while (page.records.length > 0) {
+      for (const record of page.records) {
+        const ts = new Date(record.created_at).getTime();
+        if (ts < startTime) break;
+
+        // Reconstruct history backwards: reverse accounting logic
+        if (record.type === 'account_credited') {
+          const asset = record.asset_type === 'native' ? 'XLM' : record.asset_code;
+          runningBalances[asset] = (runningBalances[asset] || 0) - parseFloat(record.amount);
+        } else if (record.type === 'account_debited') {
+          const asset = record.asset_type === 'native' ? 'XLM' : record.asset_code;
+          runningBalances[asset] = (runningBalances[asset] || 0) + parseFloat(record.amount);
+        }
+
+        history.push({
+          timestamp: ts,
+          balances: { ...runningBalances },
+          date: record.created_at.split('T')[0]
+        });
+      }
+
+      const oldestInPage = new Date(page.records[page.records.length - 1].created_at).getTime();
+      if (oldestInPage < startTime) break;
+      page = await page.next();
+    }
+  } catch (err) {
+    console.warn('Horizon history engine encountered an error or truncation:', err);
   }
-
-  return data
+  return history.reverse();
 }
 
 // ── Risk Assessment ───────────────────────────────────────────────────────────
@@ -407,7 +443,7 @@ export default {
   identifyConcentrationRisks,
   calculatePerformanceMetrics,
   calculate24hPortfolioChange,
-  generateHistoricalPerformance,
+  fetchHistoricalPerformance,
   calculateVolatility,
   calculateSharpeRatio,
   assessPortfolioRisk,

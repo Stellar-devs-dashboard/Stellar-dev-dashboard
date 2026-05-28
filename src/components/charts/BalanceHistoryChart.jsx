@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../lib/store'
 import { formatXLMValue, TOOLTIP_STYLE, AXIS_TICK_STYLE, CHART_COLORS } from '../../lib/chartUtils'
-import { fetchAccount, formatXLM } from '../../lib/stellar'
+import { fetchAccount, formatXLM, ee } from '../../lib/stellar'
 import { sparklinePath, throttle } from '../../utils/chartUtils'
 import Card from '../dashboard/Card'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts'
-import { Pause, Play, RefreshCw } from 'lucide-react'
+import { Pause, Play, RefreshCw, AlertCircle } from 'lucide-react'
+import { fetchHistoricalPerformance } from '../../lib/portfolioAnalytics'
 
 const BAR_COLORS = [CHART_COLORS.cyan, CHART_COLORS.amber, CHART_COLORS.green, CHART_COLORS.red, '#8884d8', '#82ca9d']
 const POLL_OPTIONS = [
@@ -40,6 +41,32 @@ export default function BalanceHistoryChart() {
       }
     }).sort((a, b) => b.balance - a.balance)
   }, [accountData])
+
+  // Seed history from Horizon pagination engine on mount/address change
+  useEffect(() => {
+    if (!connectedAddress || balanceData.length === 0) return
+
+    const seedHistory = async () => {
+      try {
+        const server = ee(network)
+        const currentMap = {}
+        balanceData.forEach(b => { currentMap[b.asset] = b.balance })
+        
+        // Fetch last 7 days of snapshots to populate trends
+        const snapshots = await fetchHistoricalPerformance(server, connectedAddress, currentMap, 7)
+        
+        const map = historyRef.current
+        snapshots.forEach(snap => {
+          Object.entries(snap.balances).forEach(([asset, balance]) => {
+            const arr = map.get(asset) ?? []
+            map.set(asset, [...arr, balance].slice(-HISTORY_LIMIT))
+          })
+        })
+        setHistorySnapshot(n => n + 1)
+      } catch (e) { console.warn('History seeding failed', e) }
+    }
+    seedHistory()
+  }, [connectedAddress, network])
 
   // Append the current balance snapshot to per-asset history (capped).
   useEffect(() => {

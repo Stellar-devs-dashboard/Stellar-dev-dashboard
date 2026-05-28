@@ -113,3 +113,24 @@ export function flattenBalance(balance) {
     selling_liabilities: balance.selling_liabilities ?? "0",
   };
 }
+
+/**
+ * Export historical running balances to CSV.
+ * Format: Timestamp, Balance, Asset
+ * @param {Array} history - Reconstructed history snapshot array
+ * @param {string} filename
+ */
+export function exportHistoricalBalances(history, filename = "portfolio-history") {
+  const rows = [];
+  history.forEach((snapshot) => {
+    const timestamp = new Date(snapshot.timestamp).toISOString();
+    Object.entries(snapshot.balances).forEach(([asset, balance]) => {
+      rows.push({
+        Timestamp: timestamp,
+        Balance: balance,
+        Asset: asset,
+      });
+    });
+  });
+  exportCsv(rows, filename, ["Timestamp", "Balance", "Asset"]);
+}

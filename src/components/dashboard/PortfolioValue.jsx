@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../lib/store'
 import { fetchPrices, calculatePortfolioValue } from '../../lib/priceFeed'
+import { ee } from '../../lib/stellar'
 import {
   calculateAssetAllocation,
   calculateDiversificationScore,
   identifyConcentrationRisks,
   calculate24hPortfolioChange,
-  generateHistoricalPerformance,
+  fetchHistoricalPerformance,
   calculateVolatility,
   assessPortfolioRisk,
   generatePortfolioSummary
@@ -48,8 +49,10 @@ function Panel({ title, children, style = {} }) {
 }
 
 export default function PortfolioValue() {
-  const { accountData, prices, setPrices, pricesLoading, setPricesLoading, setPricesError } = useStore()
+  const { accountData, connectedAddress, network, prices, setPrices, pricesLoading, setPricesLoading, setPricesError } = useStore()
   const [activeView, setActiveView] = useState('overview') // overview, allocation, performance, risk
+  const [historicalData, setHistoricalData] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const balances = accountData?.balances || []
 
@@ -85,18 +88,53 @@ export default function PortfolioValue() {
     [balances, prices]
   )
 
+  // Async pipeline for historical reconstruction
+  useEffect(() => {
+    if (!connectedAddress || !portfolio || !portfolio.items?.length) return
+
+    let cancelled = false
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      try {
+        const currentBalancesMap = {}
+        portfolio.items.forEach(item => { currentBalancesMap[item.code] = item.amount })
+
+        const server = ee(network)
+        const history = await fetchHistoricalPerformance(server, connectedAddress, currentBalancesMap, 30)
+        
+        if (!cancelled) setHistoricalData(history)
+      } catch (err) { console.error('History load failed', err) }
+      finally { if (!cancelled) setHistoryLoading(false) }
+    }
+
+    loadHistory()
+    return () => { cancelled = true }
+  }, [connectedAddress, network, portfolio?.items?.length])
+
   // Analytics calculations
   const analytics = useMemo(() => {
     if (!portfolio || !portfolio.items || portfolio.items.length === 0) return null
+
+    // Value reconstructed snapshots using available price data
+    const historicalPerformance = historicalData.map(point => {
+      let totalValue = 0
+      Object.entries(point.balances).forEach(([code, amount]) => {
+        totalValue += amount * (prices[code]?.usd || 0)
+      })
+      return { ...point, value: totalValue }
+    })
 
     const allocation = calculateAssetAllocation(portfolio.items)
     const diversificationScore = calculateDiversificationScore(allocation)
     const concentrationRisks = identifyConcentrationRisks(allocation)
     const change24h = calculate24hPortfolioChange(portfolio.items)
-    const historicalPerformance = generateHistoricalPerformance(portfolio.items, 30)
     const volatility = calculateVolatility(historicalPerformance)
-    const riskAssessment = assessPortfolioRisk(allocation, volatility)
-    const summary = generatePortfolioSummary(portfolio.items, allocation, riskAssessment)
+    const riskAssessment = assessPortfolioRisk({
+      volatility,
+      diversificationScore,
+      concentrationRisks
+    })
+    const summary = generatePortfolioSummary(portfolio.items, historicalPerformance)
 
     return {
       allocation,
@@ -108,7 +146,7 @@ export default function PortfolioValue() {
       riskAssessment,
       summary
     }
-  }, [portfolio])
+  }, [portfolio, historicalData, prices])
 
   if (!accountData) {
     return (
@@ -180,7 +218,7 @@ export default function PortfolioValue() {
           })}
         </div>
 
-        {pricesLoading && (
+        {(pricesLoading || historyLoading) && (
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <div className="spinner" />
           </div>
@@ -449,7 +487,15 @@ function PerformanceView({ analytics, portfolio }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Historical Performance Chart */}
-      <Panel title="Portfolio Value (30 Days)">
+      <Panel title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          Portfolio Value (30 Days)
+          <div title="Network history truncation and Horizon pagination limits may affect data older than 30 days." 
+               style={{ cursor: 'help', opacity: 0.7 }}>
+            <AlertTriangle size={12} />
+          </div>
+        </div>
+      }>
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={historicalPerformance}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
