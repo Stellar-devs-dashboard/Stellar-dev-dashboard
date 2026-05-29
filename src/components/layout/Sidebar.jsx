@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../lib/store'
 import CopyableValue from '../dashboard/CopyableValue'
 import { NETWORKS, updateCustomNetworkConfig, switchToCustomProfile, loadCustomNetworkProfiles } from '../../lib/stellar'
@@ -43,13 +44,9 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar({ isMobile = false }) {
-  const initialCustomHeaders = getCustomNetworkAuthHeaders()
-  const initialHeaderName = Object.keys(initialCustomHeaders)[0] || 'Authorization'
-  const [customHeaderName, setCustomHeaderName] = useState(initialHeaderName)
-  const [customHeaderValue, setCustomHeaderValue] = useState(initialCustomHeaders[initialHeaderName] || '')
+  const navigate = useNavigate()
   const { 
     activeTab, 
-    setActiveTab, 
     network, 
     setNetwork, 
     connectedAddress, 
@@ -84,26 +81,8 @@ export default function Sidebar({ isMobile = false }) {
   }, [network])
 
   const handleNavClick = (tabId) => {
-    setActiveTab(tabId)
-    setMobileMenuOpen(false)
-  }
-
-  const handleSwitchProfile = async (profileId) => {
-    try {
-      await switchToCustomProfile(profileId)
-      setActiveProfileId(profileId)
-      // Force store update to refresh clients
-      const profile = customProfiles.find(p => p.id === profileId)
-      if (profile) {
-        updateCustomNetworkConfig({
-          horizonUrl: profile.horizonUrl,
-          sorobanUrl: profile.sorobanUrl,
-          passphrase: profile.passphrase,
-        })
-      }
-    } catch (err) {
-      console.error('Failed to switch profile:', err)
-    }
+    navigate(`/${tabId}`)
+    setMobileMenuOpen(false) // Close mobile menu after navigation
   }
 
   // Restore custom API key from sessionStorage on mount
