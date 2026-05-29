@@ -1,3 +1,7 @@
+import { Transaction, Networks } from '@stellar/stellar-sdk';
+import { encryptWithKey, decryptWithKey, generateKey } from './encryption.js';
+import auditTrail from './auditTrail.js';
+
 /**
  * Stellar Anchor Integration System
  * Integrates with major Stellar anchors for deposit/withdrawal operations
@@ -6,12 +10,16 @@
 class AnchorService {
   constructor() {
     this.anchors = new Map();
+    this.authSessionKey = null;
+    this.authSessionStorePrefix = 'sep10-anchor-session:';
     this.supportedAnchors = [
       {
         id: 'coinbase',
         name: 'Coinbase',
         icon: '🪙',
         website: 'https://coinbase.com',
+        homeDomain: 'coinbase.com',
+        authEndpoint: 'https://coinbase.com/auth',
         supportedAssets: ['XLM', 'USDC', 'BTC', 'ETH', 'USDT'],
         depositMethods: ['bank_transfer', 'card', 'crypto'],
         withdrawalMethods: ['bank_transfer', 'crypto'],
@@ -24,6 +32,8 @@ class AnchorService {
         name: 'Kraken',
         icon: '🐙',
         website: 'https://kraken.com',
+        homeDomain: 'kraken.com',
+        authEndpoint: 'https://kraken.com/auth',
         supportedAssets: ['XLM', 'USDC', 'BTC', 'ETH', 'USDT', 'EUR', 'USD'],
         depositMethods: ['bank_transfer', 'wire', 'crypto'],
         withdrawalMethods: ['bank_transfer', 'wire', 'crypto'],
@@ -36,6 +46,8 @@ class AnchorService {
         name: 'Binance',
         icon: '🔶',
         website: 'https://binance.com',
+        homeDomain: 'binance.com',
+        authEndpoint: 'https://binance.com/auth',
         supportedAssets: ['XLM', 'USDC', 'BTC', 'ETH', 'USDT', 'BUSD'],
         depositMethods: ['crypto', 'card', 'p2p'],
         withdrawalMethods: ['crypto', 'p2p'],
@@ -48,6 +60,8 @@ class AnchorService {
         name: 'Bitstamp',
         icon: '📊',
         website: 'https://bitstamp.net',
+        homeDomain: 'bitstamp.net',
+        authEndpoint: 'https://bitstamp.net/auth',
         supportedAssets: ['XLM', 'USDC', 'BTC', 'ETH', 'EUR', 'USD'],
         depositMethods: ['bank_transfer', 'wire', 'crypto', 'card'],
         withdrawalMethods: ['bank_transfer', 'wire', 'crypto'],
@@ -60,6 +74,8 @@ class AnchorService {
         name: 'GateHub',
         icon: '🚪',
         website: 'https://gatehub.net',
+        homeDomain: 'gatehub.net',
+        authEndpoint: 'https://gatehub.net/auth',
         supportedAssets: ['XLM', 'USDC', 'BTC', 'ETH', 'EUR', 'USD'],
         depositMethods: ['bank_transfer', 'wire', 'crypto'],
         withdrawalMethods: ['bank_transfer', 'wire', 'crypto'],
@@ -199,7 +215,7 @@ class AnchorService {
           feeCalculation,
           score: this.calculateAnchorScore(anchor, feeCalculation)
         });
-      } catch (error) {
+      } catch {
         // Skip anchors that can't process this request
       }
     });
@@ -403,6 +419,224 @@ class AnchorService {
    */
   generateReferenceCode() {
     return `STELLAR-${Date.now()}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+  }
+
+  /**
+   * Parse a minimal subset of stellar.toml to extract values used for SEP-10.
+   * @param {string} tomlText
+   * @returns {object}
+   */
+  parseToml(tomlText) {
+    const result = {};
+    tomlText.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const match = trimmed.match(/^([A-Za-z0-9_]+)\s*=\s*['"](.+?)['"]$/);
+      if (match) {
+        result[match[1]] = match[2];
+      }
+    });
+    return result;
+  }
+
+  async fetchStellarToml(homeDomain) {
+    if (!homeDomain) {
+      throw new Error('Home domain is required to resolve stellar.toml');
+    }
+
+    const url = `https://${homeDomain}/.well-known/stellar.toml`;
+    const start = performance.now();
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'text/plain' }
+    });
+    const duration = Math.round(performance.now() - start);
+
+    auditTrail.logAPICall(url, 'GET', {}, { status: response.status, responseTime: duration });
+
+    if (!response.ok) {
+      throw new Error(`Unable to fetch stellar.toml for ${homeDomain}`);
+    }
+
+    const text = await response.text();
+    return this.parseToml(text);
+  }
+
+  async getWebAuthEndpoint(anchor) {
+    if (!anchor) {
+      throw new Error('Anchor not found');
+    }
+
+    if (anchor.authEndpoint) {
+      return anchor.authEndpoint;
+    }
+
+    if (anchor.homeDomain) {
+      const toml = await this.fetchStellarToml(anchor.homeDomain);
+      if (!toml.WEB_AUTH_ENDPOINT) {
+        throw new Error(`WEB_AUTH_ENDPOINT not defined in stellar.toml for ${anchor.homeDomain}`);
+      }
+      return toml.WEB_AUTH_ENDPOINT;
+    }
+
+    throw new Error(`Anchor ${anchor.id} does not support SEP-10 authentication`);
+  }
+
+  hasWebAuth(anchorId) {
+    const anchor = this.getAnchor(anchorId);
+    return Boolean(anchor && (anchor.authEndpoint || anchor.homeDomain));
+  }
+
+  async requestChallengeTransaction(anchorId, accountPublicKey, network = 'TESTNET') {
+    const anchor = this.getAnchor(anchorId);
+    const endpoint = await this.getWebAuthEndpoint(anchor);
+    const networkPassphrase = network === 'PUBLIC' ? Networks.PUBLIC : Networks.TESTNET;
+
+    const url = new URL(endpoint);
+    url.searchParams.set('account', accountPublicKey);
+    url.searchParams.set('network_passphrase', networkPassphrase);
+
+    const start = performance.now();
+    const response = await fetch(url.toString(), { method: 'GET', headers: { 'Accept': 'application/json' } });
+    const duration = Math.round(performance.now() - start);
+
+    const responseData = await response.clone().json().catch(() => ({}));
+    auditTrail.logAPICall(url.toString(), 'GET', { account: accountPublicKey }, { status: response.status, responseTime: duration, responseData });
+
+    if (!response.ok) {
+      throw new Error(`Failed to request SEP-10 challenge: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.transaction) {
+      throw new Error('Invalid SEP-10 challenge response from anchor');
+    }
+
+    try {
+      new Transaction(data.transaction, networkPassphrase);
+    } catch (error) {
+      throw new Error(`Invalid SEP-10 challenge transaction: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async submitChallengeTransaction(anchorId, signedTransactionXdr) {
+    const anchor = this.getAnchor(anchorId);
+    const endpoint = await this.getWebAuthEndpoint(anchor);
+    const start = performance.now();
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transaction: signedTransactionXdr })
+    });
+
+    const duration = Math.round(performance.now() - start);
+    const responseBody = await response.clone().json().catch(() => ({}));
+
+    auditTrail.logAPICall(endpoint, 'POST', { transaction: '[REDACTED]' }, { status: response.status, responseTime: duration, response: responseBody });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`SEP-10 authentication failed (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (!data.token) {
+      throw new Error('Anchor auth response did not include a JWT token');
+    }
+
+    return data.token;
+  }
+
+  async getOrCreateSessionKey() {
+    if (this.authSessionKey) {
+      return this.authSessionKey;
+    }
+
+    this.authSessionKey = await generateKey();
+    return this.authSessionKey;
+  }
+
+  async saveAnchorAuthSession(anchorId, token, accountPublicKey, network, homeDomain) {
+    try {
+      const rawKey = await this.getOrCreateSessionKey();
+      const encrypted = await encryptWithKey(token, rawKey);
+      const sessionPayload = {
+        ciphertext: encrypted.ciphertext,
+        iv: encrypted.iv,
+        accountPublicKey,
+        network,
+        homeDomain,
+        createdAt: new Date().toISOString()
+      };
+      sessionStorage.setItem(this.authSessionStorePrefix + anchorId, JSON.stringify(sessionPayload));
+      auditTrail.logSecurityEvent('Stored SEP-10 auth session', { anchorId, homeDomain });
+      return true;
+    } catch (error) {
+      auditTrail.logError(error, { operation: 'saveAnchorAuthSession', anchorId });
+      throw error;
+    }
+  }
+
+  async getAnchorAuthSession(anchorId) {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      return null;
+    }
+
+    const sessionString = sessionStorage.getItem(this.authSessionStorePrefix + anchorId);
+    if (!sessionString) {
+      return null;
+    }
+
+    try {
+      const sessionPayload = JSON.parse(sessionString);
+      const rawKey = await this.getOrCreateSessionKey();
+      const token = await decryptWithKey(sessionPayload.ciphertext, rawKey, sessionPayload.iv);
+      return {
+        token,
+        accountPublicKey: sessionPayload.accountPublicKey,
+        network: sessionPayload.network,
+        homeDomain: sessionPayload.homeDomain,
+        createdAt: sessionPayload.createdAt
+      };
+    } catch (error) {
+      sessionStorage.removeItem(this.authSessionStorePrefix + anchorId);
+      auditTrail.logSecurityEvent('Failed to decrypt SEP-10 auth session', { anchorId, error: error.message });
+      return null;
+    }
+  }
+
+  async clearAnchorAuthSession(anchorId) {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      return false;
+    }
+
+    sessionStorage.removeItem(this.authSessionStorePrefix + anchorId);
+    auditTrail.logUserAction('Cleared SEP-10 auth session', { anchorId });
+    return true;
+  }
+
+  parseJwt(token) {
+    if (!token || typeof token !== 'string') {
+      return null;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    try {
+      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
+      const decoded = atob(padded);
+      return JSON.parse(decoded);
+    } catch (error) {
+      auditTrail.logError(error, { operation: 'parseJwt' });
+      return null;
+    }
   }
 
   /**

@@ -1,16 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  Clock,
   DollarSign,
   AlertTriangle,
   CheckCircle,
   ExternalLink,
   Info,
-  Star,
-  Shield,
-  Zap,
   ArrowUpDown,
   Wallet,
   CreditCard,
@@ -21,6 +17,7 @@ import {
 } from 'lucide-react';
 import anchorService from '../../lib/anchors.js';
 import auditTrail from '../../lib/auditTrail.js';
+import { connectFreighter, signTransactionWithFreighter } from '../../lib/wallet/freighter.js';
 
 const METHOD_ICONS = {
   bank_transfer: BanknoteIcon,
@@ -48,6 +45,11 @@ export default function AnchorIntegration() {
   const [loading, setLoading] = useState(false);
   const [expandedAnchor, setExpandedAnchor] = useState(null);
   const [supportedAssets, setSupportedAssets] = useState([]);
+  const [authStatus, setAuthStatus] = useState('disconnected');
+  const [authMessage, setAuthMessage] = useState('Not connected');
+  const [authError, setAuthError] = useState(null);
+  const [anchorSession, setAnchorSession] = useState(null);
+  const [isAnchorAuthLoading, setIsAnchorAuthLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -57,7 +59,7 @@ export default function AnchorIntegration() {
     if (selectedAsset && amount && transactionType) {
       loadComparison();
     }
-  }, [selectedAsset, amount, transactionType]);
+  }, [selectedAsset, amount, transactionType, loadComparison]);
 
   const loadData = async () => {
     try {
@@ -76,7 +78,7 @@ export default function AnchorIntegration() {
     }
   };
 
-  const loadComparison = async () => {
+  const loadComparison = useCallback(async () => {
     try {
       setLoading(true);
       const amountNum = parseFloat(amount);
@@ -105,7 +107,7 @@ export default function AnchorIntegration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAsset, amount, transactionType]);
 
   const handleAnchorSelect = (anchor) => {
     setSelectedAnchor(anchor);
@@ -115,6 +117,110 @@ export default function AnchorIntegration() {
       asset: selectedAsset,
       amount,
       type: transactionType
+    });
+  };
+
+  useEffect(() => {
+    const loadAnchorSession = async () => {
+      if (!selectedAnchor) {
+        setAnchorSession(null);
+        setAuthStatus('disconnected');
+        setAuthMessage('Not connected');
+        return;
+      }
+
+      if (!anchorService.hasWebAuth(selectedAnchor.id)) {
+        setAnchorSession(null);
+        setAuthStatus('disconnected');
+        setAuthMessage('Anchor SEP-10 not configured');
+        return;
+      }
+
+      try {
+        const session = await anchorService.getAnchorAuthSession(selectedAnchor.id);
+        if (session && session.token) {
+          setAnchorSession(session);
+          setAuthStatus('connected');
+          setAuthMessage(`Connected as ${session.accountPublicKey}`);
+        } else {
+          setAnchorSession(null);
+          setAuthStatus('disconnected');
+          setAuthMessage('Not connected');
+        }
+      } catch (error) {
+        setAnchorSession(null);
+        setAuthStatus('error');
+        setAuthMessage('Unable to load anchor auth session');
+        auditTrail.logError(error, { operation: 'loadAnchorAuthSession', anchorId: selectedAnchor.id });
+      }
+    };
+
+    loadAnchorSession();
+  }, [selectedAnchor]);
+
+  const handleConnectToAnchor = async () => {
+    if (!selectedAnchor) return;
+
+    setAuthError(null);
+    setIsAnchorAuthLoading(true);
+    setAuthStatus('loading');
+
+    try {
+      const account = await connectFreighter();
+      const challengeResponse = await anchorService.requestChallengeTransaction(
+        selectedAnchor.id,
+        account.publicKey,
+        account.network
+      );
+
+      const signedXdr = await signTransactionWithFreighter(challengeResponse.transaction, account.network);
+      const token = await anchorService.submitChallengeTransaction(selectedAnchor.id, signedXdr, account.network);
+
+      await anchorService.saveAnchorAuthSession(
+        selectedAnchor.id,
+        token,
+        account.publicKey,
+        account.network,
+        selectedAnchor.homeDomain
+      );
+
+      const jwtPayload = anchorService.parseJwt(token);
+      const session = {
+        token,
+        accountPublicKey: account.publicKey,
+        network: account.network,
+        homeDomain: selectedAnchor.homeDomain,
+        tokenPayload: jwtPayload
+      };
+
+      setAnchorSession(session);
+      setAuthStatus('connected');
+      setAuthMessage(`Connected as ${account.publicKey}`);
+      auditTrail.logUserAction('Authenticated with anchor via SEP-10', {
+        anchorId: selectedAnchor.id,
+        anchorName: selectedAnchor.name,
+        accountPublicKey: account.publicKey,
+        network: account.network,
+        homeDomain: selectedAnchor.homeDomain
+      });
+    } catch (error) {
+      setAuthStatus('error');
+      setAuthError(error.message || 'Anchor authentication failed');
+      auditTrail.logError(error, { operation: 'anchorSep10Auth', anchorId: selectedAnchor.id, error: error?.message });
+    } finally {
+      setIsAnchorAuthLoading(false);
+    }
+  };
+
+  const handleDisconnectAnchor = async () => {
+    if (!selectedAnchor) return;
+    await anchorService.clearAnchorAuthSession(selectedAnchor.id);
+    setAnchorSession(null);
+    setAuthStatus('disconnected');
+    setAuthMessage('Not connected');
+    auditTrail.logUserAction('Disconnected anchor SEP-10 session', {
+      anchorId: selectedAnchor.id,
+      anchorName: selectedAnchor.name
     });
   };
 
@@ -377,6 +483,99 @@ export default function AnchorIntegration() {
               </ul>
             </div>
           )}
+
+          <div style={{ marginTop: '24px', padding: '18px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Anchor Authentication
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {anchorService.hasWebAuth(selectedAnchor.id)
+                    ? 'This anchor supports SEP-10 web authentication. Connect with Freighter to request a signed challenge and receive a secure session token.'
+                    : 'SEP-10 authentication is not available for this anchor.'}
+                </div>
+              </div>
+
+              {anchorService.hasWebAuth(selectedAnchor.id) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  <button
+                    onClick={handleConnectToAnchor}
+                    disabled={isAnchorAuthLoading}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      background: 'var(--cyan)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      color: '#FFF',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      opacity: isAnchorAuthLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {anchorSession ? 'Reconnect to Anchor' : 'Connect to Anchor'}
+                  </button>
+                  <button
+                    onClick={handleDisconnectAnchor}
+                    disabled={!anchorSession || isAnchorAuthLoading}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      background: 'transparent',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      cursor: anchorSession && !isAnchorAuthLoading ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Connection Status</div>
+                <div style={{ marginTop: '6px' }}>{authStatus === 'loading' ? 'Connecting...' : authMessage}</div>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Anchor Domain</div>
+                <div style={{ marginTop: '6px' }}>{selectedAnchor.homeDomain || 'Unknown'}</div>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Authenticated Wallet</div>
+                <div style={{ marginTop: '6px' }}>{anchorSession?.accountPublicKey || 'None'}</div>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Network</div>
+                <div style={{ marginTop: '6px' }}>{anchorSession?.network || 'TESTNET'}</div>
+              </div>
+            </div>
+
+            {anchorSession?.tokenPayload?.exp && (
+              <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Token expires at {new Date(anchorSession.tokenPayload.exp * 1000).toLocaleString()}.
+              </div>
+            )}
+
+            {authError && (
+              <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--red)' }}>
+                {authError}
+              </div>
+            )}
+          </div>
 
           <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
             <button
