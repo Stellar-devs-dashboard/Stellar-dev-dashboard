@@ -123,6 +123,39 @@ function validateBeginSponsoring(params: Record<string, unknown>): FieldError[] 
   return [];
 }
 
+function validateEndSponsoring(): FieldError[] {
+  // endSponsoringFutureReserves has no required parameters
+  return [];
+}
+
+function validateFeeBump(params: Record<string, unknown>): FieldError[] {
+  const errors: FieldError[] = [];
+  const feeSourceResult = validateStellarAddress(params.feeSource);
+  if (!feeSourceResult.valid)
+    errors.push({ field: "feeSource", message: "Fee source: " + feeSourceResult.errors[0] });
+  if (!params.innerTransaction || typeof params.innerTransaction !== "string" || String(params.innerTransaction).trim() === "")
+    errors.push({ field: "innerTransaction", message: "Inner transaction XDR is required and must be a non-empty string." });
+  const baseFee = parseInt(String(params.baseFee), 10);
+  if (!Number.isFinite(baseFee) || baseFee <= 0)
+    errors.push({ field: "baseFee", message: "Base fee must be a positive integer." });
+  return errors;
+}
+
+function validateClawback(params: Record<string, unknown>): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!isValidAssetCode(params.assetCode))
+    errors.push({ field: "assetCode", message: "Asset code must be 1–12 uppercase letters/digits." });
+  const issuerResult = validateStellarAddress(params.assetIssuer);
+  if (!issuerResult.valid)
+    errors.push({ field: "assetIssuer", message: issuerResult.errors[0] });
+  const fromResult = validateStellarAddress(params.from);
+  if (!fromResult.valid)
+    errors.push({ field: "from", message: fromResult.errors[0] });
+  if (!isPositiveAmount(params.amount))
+    errors.push({ field: "amount", message: "Amount must be a positive number." });
+  return errors;
+}
+
 /**
  * Validate a single operation.
  */
@@ -141,6 +174,9 @@ export function validateOperation(
     case "claimClaimableBalance": return validateClaimClaimableBalance(params);
     case "bumpSequence": return validateBumpSequence(params);
     case "beginSponsoringFutureReserves": return validateBeginSponsoring(params);
+    case "endSponsoringFutureReserves": return validateEndSponsoring();
+    case "feeBump": return validateFeeBump(params);
+    case "clawback": return validateClawback(params);
     default: return [];
   }
 }

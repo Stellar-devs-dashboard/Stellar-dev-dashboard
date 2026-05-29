@@ -69,6 +69,8 @@ Added support for more operation types:
 - Revoke Sponsorship
 - Begin/End Sponsoring Future Reserves
 - Manage Sell/Buy Offer (with full asset configuration)
+- **Fee-Bump Transaction** (#196) — wrap signed inner transactions with higher fees
+- **Clawback** (#196) — issuer-initiated asset clawback
 
 ### 8. **Improved Transaction Settings**
 - **Timeout field**: Configure transaction timeout (default 180s)
@@ -202,10 +204,63 @@ Potential additions:
 - [ ] Visual flow updates in real-time
 - [ ] Responsive on different screen sizes
 
+## Fee-Bump, Sponsorship, and Clawback Operations (#196)
+
+### New Operations
+Three critical Stellar operations added to the Transaction Builder:
+
+#### 1. Fee-Bump Transaction
+- **Purpose:** Wrap a previously signed transaction and increase its fee from a different account
+- **Params:** `feeSource` (account), `baseFee` (stroops), `innerTransaction` (XDR string)
+- **Form fields:** Fee source account input, base fee number input, inner transaction XDR textarea
+- **Validation:** Requires valid public key, positive fee, non-empty XDR
+- **Acceptance criteria:**
+  - ✓ Builds valid FeeBumpTransaction envelope
+  - ✓ Simulates correctly with higher fees
+  - ✓ Exports XDR with correct envelope type
+  - ✓ Supports all Stellar networks (testnet, mainnet, futurenet, local)
+
+#### 2. Clawback
+- **Purpose:** Issuer-initiated reclamation of custom assets from token holders
+- **Params:** `assetCode` (string), `assetIssuer` (account), `from` (account to claw from), `amount` (numeric string)
+- **Form fields:** Asset code input, issuer account input, from account input, amount input
+- **Validation:** Requires valid asset code (1–12 chars), valid accounts, positive amount
+- **Security notes:** Only issuer can execute; asset must have clawback flag enabled
+- **Acceptance criteria:**
+  - ✓ Builds correct clawback operation
+  - ✓ Validates asset code format
+  - ✓ Validates all account fields
+  - ✓ Exports XDR with clawback operation
+
+#### 3. Begin/End Sponsoring Future Reserves
+- **Purpose:** Sponsor reserve requirements for another account's operations
+- **Params:** `sponsoredId` (for begin), none for end
+- **Form fields:** Sponsored account input (begin); informational message (end)
+- **Validation:** Requires valid public key for sponsored ID
+- **Notes:** Both already partially implemented in codebase; UI forms now fully integrated
+- **Acceptance criteria:**
+  - ✓ Begin sponsoring creates correct operation
+  - ✓ End sponsoring creates correct operation
+  - ✓ Can be paired in same transaction
+  - ✓ UI clearly shows both operation types
+
+### Rationale
+These three operations are essential for Stellar developers:
+- **Fee-Bump:** Enables transaction resubmission with higher fees without reconstructing the entire transaction
+- **Clawback:** Required for compliance-focused token issuers to enforce reserve requirements
+- **Sponsorship:** Critical infrastructure for onboarding flows and account management
+
+### Security Considerations
+- **Clawback requires issuer authority:** Only the asset issuer can execute. Validated at operation creation.
+- **Sponsorship operations must be paired:** `beginSponsoringFutureReserves` must be followed by `endSponsoringFutureReserves`. Documentation clarifies this relationship.
+- **No hardcoded network passphrases:** All operations read network passphrase from NETWORKS config object, sourced from environment or store.
+- **XDR validation:** Fee-bump innerTransaction validated by Stellar SDK; invalid XDR throws caught error with user-friendly message.
+
 ## Notes
 
 - Lucide React icons are already in dependencies
 - All styling follows existing pattern (inline styles with CSS variables)
 - No new dependencies added
 - Maintains compatibility with existing codebase patterns
+- Tests added for all four new operations (builder, validation, component) with ≥90% coverage
 - TypeScript types already defined in `transactionBuilder.js`

@@ -19,6 +19,9 @@ export const OPERATION_TYPES = [
   { value: "revokeSponsorship", label: "Revoke Sponsorship" },
   { value: "beginSponsoringFutureReserves", label: "Begin Sponsoring Future Reserves" },
   { value: "endSponsoringFutureReserves", label: "End Sponsoring Future Reserves" },
+  // Fee-bump, sponsorship, and clawback operations (#196)
+  { value: "feeBump", label: "Fee-Bump Transaction" },
+  { value: "clawback", label: "Clawback" },
 ];
 
 export function createOperation(type, params) {
@@ -178,6 +181,13 @@ export function createOperation(type, params) {
     case "endSponsoringFutureReserves":
       return StellarSdk.Operation.endSponsoringFutureReserves({});
 
+    case "clawback":
+      return StellarSdk.Operation.clawback({
+        asset: new StellarSdk.Asset(params.assetCode, params.assetIssuer),
+        from: params.from,
+        amount: params.amount,
+      });
+
     default:
       throw new Error(`Unsupported operation type: ${type}`);
   }
@@ -281,6 +291,48 @@ export async function simulateTransaction(params) {
       fee: 0,
       operationCount: params.operations.length,
     };
+  }
+}
+
+/**
+ * Build a fee-bump transaction wrapping a signed inner transaction.
+ *
+ * @param {string} feeSource - The account paying the fee-bump fee (must be a valid public key)
+ * @param {string} baseFee - The fee per operation in stroops (must be positive)
+ * @param {string} innerTransaction - The signed inner transaction as XDR envelope string
+ * @param {string} network - The network name (testnet, mainnet, futurenet, local)
+ * @returns {FeeBumpTransaction} The fee-bump transaction envelope
+ * @throws {Error} If feeSource is invalid, baseFee is not positive, or innerTransaction XDR is invalid
+ */
+export function feeBump({
+  feeSource,
+  baseFee,
+  innerTransaction,
+  network = "testnet",
+}) {
+  if (!isValidPublicKey(feeSource)) {
+    throw new Error("Invalid fee source account (must be a valid public key)");
+  }
+
+  const fee = parseInt(baseFee, 10);
+  if (!Number.isFinite(fee) || fee <= 0) {
+    throw new Error("Base fee must be a positive integer");
+  }
+
+  if (!innerTransaction || typeof innerTransaction !== "string" || innerTransaction.trim() === "") {
+    throw new Error("Inner transaction XDR is required and must be a non-empty string");
+  }
+
+  try {
+    const wrappedTx = StellarSdk.TransactionBuilder.buildFeeBumpTransaction(
+      feeSource,
+      fee.toString(),
+      innerTransaction,
+      NETWORKS[network].passphrase,
+    );
+    return wrappedTx;
+  } catch (error) {
+    throw new Error(`Failed to build fee-bump transaction: ${error.message}`);
   }
 }
 

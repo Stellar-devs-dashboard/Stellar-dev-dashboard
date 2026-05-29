@@ -45,8 +45,6 @@ export function validateStellarAddress(value: unknown): ValidationResult {
   
   return fail('Invalid Stellar address. Must be a G... address, M... muxed account, or name*domain federated address.')
 }
-  return ok()
-}
 
 // ─── Amount ───────────────────────────────────────────────────────────────────
 

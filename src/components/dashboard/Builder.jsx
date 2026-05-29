@@ -8,6 +8,10 @@ import { Plus, Trash2, Play, Copy, AlertCircle, CheckCircle } from 'lucide-react
 const OPERATION_TYPES = [
   { id: 'payment', label: 'Payment', icon: '→' },
   { id: 'createAccount', label: 'Create Account', icon: '+' },
+  { id: 'clawback', label: 'Clawback', icon: '↶' },
+  { id: 'beginSponsoringFutureReserves', label: 'Begin Sponsoring', icon: 'Ⓢ' },
+  { id: 'endSponsoringFutureReserves', label: 'End Sponsoring', icon: 'Ⓔ' },
+  { id: 'feeBump', label: 'Fee-Bump Transaction', icon: '⇧' },
 ]
 
 export default function Builder() {
@@ -46,15 +50,30 @@ export default function Builder() {
     const newOp = {
       id: Date.now(),
       type,
-      ...(type === 'payment' ? {
-        destination: '',
-        asset: 'XLM',
-        amount: ''
-      } : {
-        destination: '',
-        startingBalance: ''
-      })
     }
+    
+    if (type === 'payment') {
+      newOp.destination = ''
+      newOp.asset = 'XLM'
+      newOp.amount = ''
+    } else if (type === 'createAccount') {
+      newOp.destination = ''
+      newOp.startingBalance = ''
+    } else if (type === 'clawback') {
+      newOp.assetCode = ''
+      newOp.assetIssuer = ''
+      newOp.from = ''
+      newOp.amount = ''
+    } else if (type === 'beginSponsoringFutureReserves') {
+      newOp.sponsoredId = ''
+    } else if (type === 'endSponsoringFutureReserves') {
+      // No additional fields needed
+    } else if (type === 'feeBump') {
+      newOp.feeSource = ''
+      newOp.baseFee = ''
+      newOp.innerTransaction = ''
+    }
+    
     setOperations([...operations, newOp])
   }
 
@@ -445,6 +464,29 @@ export default function Builder() {
 
 function OperationCard({ operation, index, onUpdate, onRemove }) {
   const { type } = operation
+  
+  const getTypeLabel = () => {
+    switch (type) {
+      case 'payment': return 'Payment'
+      case 'createAccount': return 'Create Account'
+      case 'clawback': return 'Clawback'
+      case 'beginSponsoringFutureReserves': return 'Begin Sponsoring Future Reserves'
+      case 'endSponsoringFutureReserves': return 'End Sponsoring Future Reserves'
+      case 'feeBump': return 'Fee-Bump Transaction'
+      default: return type
+    }
+  }
+
+  const fieldInputStyle = {
+    width: '100%',
+    padding: '8px 10px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--bg-card)',
+    color: 'var(--text-primary)',
+    fontSize: '11px',
+    fontFamily: 'var(--font-mono)'
+  }
 
   return (
     <div style={{
@@ -465,7 +507,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
           fontWeight: 600,
           color: 'var(--text-primary)'
         }}>
-          Operation {index + 1}: {type === 'payment' ? 'Payment' : 'Create Account'}
+          Operation {index + 1}: {getTypeLabel()}
         </div>
         <button
           onClick={() => onRemove(operation.id)}
@@ -481,31 +523,21 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: type === 'payment' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '12px' }}>
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
-            Destination
-          </label>
-          <input
-            type="text"
-            placeholder="G..."
-            value={operation.destination}
-            onChange={(e) => onUpdate(operation.id, 'destination', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono)'
-            }}
-          />
-        </div>
-
-        {type === 'payment' ? (
+      <div style={{ display: 'grid', gridTemplateColumns: type === 'payment' ? '1fr 1fr 1fr' : type === 'clawback' ? '1fr 1fr 1fr 1fr' : type === 'feeBump' ? '1fr' : '1fr', gap: '12px' }}>
+        {type === 'payment' && (
           <>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Destination
+              </label>
+              <input
+                type="text"
+                placeholder="G..."
+                value={operation.destination}
+                onChange={(e) => onUpdate(operation.id, 'destination', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Asset
@@ -513,15 +545,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <select
                 value={operation.asset}
                 onChange={(e) => onUpdate(operation.id, 'asset', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  fontSize: '11px'
-                }}
+                style={{...fieldInputStyle, fontFamily: 'inherit'}}
               >
                 <option value="XLM">XLM</option>
               </select>
@@ -535,41 +559,157 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
                 placeholder="0.0000000"
                 value={operation.amount}
                 onChange={(e) => onUpdate(operation.id, 'amount', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+          </>
+        )}
+        
+        {type === 'createAccount' && (
+          <>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Destination
+              </label>
+              <input
+                type="text"
+                placeholder="G..."
+                value={operation.destination}
+                onChange={(e) => onUpdate(operation.id, 'destination', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Starting Balance
+              </label>
+              <input
+                type="text"
+                placeholder="1.0000000"
+                value={operation.startingBalance}
+                onChange={(e) => onUpdate(operation.id, 'startingBalance', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+          </>
+        )}
+        
+        {type === 'clawback' && (
+          <>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Asset Code
+              </label>
+              <input
+                type="text"
+                placeholder="USDC"
+                value={operation.assetCode || ''}
+                onChange={(e) => onUpdate(operation.id, 'assetCode', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Asset Issuer
+              </label>
+              <input
+                type="text"
+                placeholder="G..."
+                value={operation.assetIssuer || ''}
+                onChange={(e) => onUpdate(operation.id, 'assetIssuer', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                From
+              </label>
+              <input
+                type="text"
+                placeholder="G..."
+                value={operation.from || ''}
+                onChange={(e) => onUpdate(operation.id, 'from', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Amount
+              </label>
+              <input
+                type="text"
+                placeholder="0.0000000"
+                value={operation.amount || ''}
+                onChange={(e) => onUpdate(operation.id, 'amount', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+          </>
+        )}
+        
+        {type === 'beginSponsoringFutureReserves' && (
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+              Sponsored ID
+            </label>
+            <input
+              type="text"
+              placeholder="G..."
+              value={operation.sponsoredId || ''}
+              onChange={(e) => onUpdate(operation.id, 'sponsoredId', e.target.value)}
+              style={fieldInputStyle}
+            />
+          </div>
+        )}
+        
+        {type === 'endSponsoringFutureReserves' && (
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px', background: 'var(--bg-base)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            This operation has no parameters. The account calling this operation ends its own sponsorship.
+          </div>
+        )}
+
+        {type === 'feeBump' && (
+          <>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Fee Source Account
+              </label>
+              <input
+                type="text"
+                placeholder="G... account paying fee-bump fee"
+                value={operation.feeSource || ''}
+                onChange={(e) => onUpdate(operation.id, 'feeSource', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Base Fee (stroops)
+              </label>
+              <input
+                type="number"
+                placeholder="100"
+                value={operation.baseFee || ''}
+                onChange={(e) => onUpdate(operation.id, 'baseFee', e.target.value)}
+                style={fieldInputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                Inner Transaction XDR
+              </label>
+              <textarea
+                placeholder="Paste the signed inner transaction XDR envelope here"
+                value={operation.innerTransaction || ''}
+                onChange={(e) => onUpdate(operation.id, 'innerTransaction', e.target.value)}
                 style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)'
+                  ...fieldInputStyle,
+                  minHeight: '80px',
+                  resize: 'vertical'
                 }}
               />
             </div>
           </>
-        ) : (
-          <div>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
-              Starting Balance
-            </label>
-            <input
-              type="text"
-              placeholder="1.0000000"
-              value={operation.startingBalance}
-              onChange={(e) => onUpdate(operation.id, 'startingBalance', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--bg-card)',
-                color: 'var(--text-primary)',
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)'
-              }}
-            />
-          </div>
         )}
       </div>
     </div>

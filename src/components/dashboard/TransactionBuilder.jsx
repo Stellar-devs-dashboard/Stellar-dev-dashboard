@@ -249,6 +249,17 @@ export default function TransactionBuilder() {
         if (!op.params.destination) opErrors.push("Destination required");
       } else if (op.type === "manageData") {
         if (!op.params.name) opErrors.push("Data name required");
+      } else if (op.type === "feeBump") {
+        if (!op.params.feeSource) opErrors.push("Fee source required");
+        if (!op.params.baseFee || parseFloat(op.params.baseFee) <= 0) opErrors.push("Base fee must be positive");
+        if (!op.params.innerTransaction || op.params.innerTransaction.trim() === "") opErrors.push("Inner transaction XDR required");
+      } else if (op.type === "beginSponsoringFutureReserves") {
+        if (!op.params.sponsoredId) opErrors.push("Sponsored ID required");
+      } else if (op.type === "clawback") {
+        if (!op.params.assetCode) opErrors.push("Asset code required");
+        if (!op.params.assetIssuer) opErrors.push("Asset issuer required");
+        if (!op.params.from) opErrors.push("From account required");
+        if (!op.params.amount || parseFloat(op.params.amount) <= 0) opErrors.push("Valid amount required");
       }
       
       if (opErrors.length > 0) {
@@ -516,6 +527,116 @@ export default function TransactionBuilder() {
                 onChange={(e) => updateOperation(op.id, "price", e.target.value)}
                 placeholder="1.5"
                 style={textInputStyle()}
+              />
+            </LabeledField>
+          </>
+        );
+
+      case "feeBump":
+        return (
+          <>
+            <LabeledField label="Fee Source Account">
+              <input
+                value={op.params.feeSource || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "feeSource", e.target.value)
+                }
+                placeholder="G... account paying fee-bump fee"
+                style={textInputStyle(hasErrors)}
+              />
+            </LabeledField>
+            <LabeledField label="Base Fee (stroops)">
+              <input
+                type="number"
+                value={op.params.baseFee || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "baseFee", e.target.value)
+                }
+                placeholder="100"
+                style={textInputStyle(hasErrors)}
+              />
+            </LabeledField>
+            <LabeledField label="Inner Transaction XDR">
+              <textarea
+                value={op.params.innerTransaction || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "innerTransaction", e.target.value)
+                }
+                placeholder="Paste the signed inner transaction XDR envelope here"
+                style={{
+                  ...textInputStyle(hasErrors),
+                  minHeight: "100px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "11px",
+                  resize: "vertical",
+                }}
+              />
+            </LabeledField>
+          </>
+        );
+
+      case "beginSponsoringFutureReserves":
+        return (
+          <LabeledField label="Sponsored Account ID">
+            <input
+              value={op.params.sponsoredId || ""}
+              onChange={(e) =>
+                updateOperation(op.id, "sponsoredId", e.target.value)
+              }
+              placeholder="G... account to be sponsored"
+              style={textInputStyle(hasErrors)}
+            />
+          </LabeledField>
+        );
+
+      case "endSponsoringFutureReserves":
+        return (
+          <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "10px", background: "var(--bg-base)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+            This operation has no required parameters. The account calling this operation ends its own sponsorship.
+          </div>
+        );
+
+      case "clawback":
+        return (
+          <>
+            <LabeledField label="Asset Code">
+              <input
+                value={op.params.assetCode || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "assetCode", e.target.value)
+                }
+                placeholder="USDC"
+                style={textInputStyle(hasErrors)}
+              />
+            </LabeledField>
+            <LabeledField label="Asset Issuer">
+              <input
+                value={op.params.assetIssuer || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "assetIssuer", e.target.value)
+                }
+                placeholder="G... issuer address"
+                style={textInputStyle(hasErrors)}
+              />
+            </LabeledField>
+            <LabeledField label="From Account">
+              <input
+                value={op.params.from || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "from", e.target.value)
+                }
+                placeholder="G... account to claw back from"
+                style={textInputStyle(hasErrors)}
+              />
+            </LabeledField>
+            <LabeledField label="Amount">
+              <input
+                value={op.params.amount || ""}
+                onChange={(e) =>
+                  updateOperation(op.id, "amount", e.target.value)
+                }
+                placeholder="10.5"
+                style={textInputStyle(hasErrors)}
               />
             </LabeledField>
           </>
