@@ -5,8 +5,10 @@ import CopyableValue from './CopyableValue';
 import DashboardGrid from '../layout/DashboardGrid';
 import WidgetSelector from '../layout/WidgetSelector';
 import { useResponsive } from '../../hooks/useResponsive';
-import { usePersistedState } from '../../hooks/usePersistedState';
 import { addBreadcrumb } from '../../lib/errorReporting';
+
+// Import async layout management hooks from userPreferences
+import { getDashboardLayout, saveDashboardLayout } from '../../lib/userPreferences';
 
 // Import widget components
 import BalanceWidget from '../layout/widgets/BalanceWidget';
@@ -17,12 +19,25 @@ import AccountStatsWidget from '../layout/widgets/AccountStatsWidget';
 import QuickActionsWidget from '../layout/widgets/QuickActionsWidget';
 import PriceTickerWidget from '../layout/widgets/PriceTickerWidget';
 
-// Default widget layout
+// Get widget component class/function by string identifier
+const getWidgetComponent = (type) => {
+  const components = {
+    balance: BalanceWidget,
+    assets: AssetsWidget,
+    transactions: TransactionsWidget,
+    networkStats: NetworkStatsWidget,
+    accountStats: AccountStatsWidget,
+    quickActions: QuickActionsWidget,
+    priceTicker: PriceTickerWidget
+  };
+  return components[type] || BalanceWidget;
+};
+
+// Default widget configuration layout fallbacks
 const DEFAULT_WIDGETS = [
   {
     id: 'balance-default',
     type: 'balance',
-    component: React.createElement(BalanceWidget, { key: 'balance-default' }),
     width: 300,
     height: 250,
     span: 1
@@ -30,7 +45,6 @@ const DEFAULT_WIDGETS = [
   {
     id: 'assets-default',
     type: 'assets',
-    component: React.createElement(AssetsWidget, { key: 'assets-default' }),
     width: 350,
     height: 300,
     span: 1
@@ -38,7 +52,6 @@ const DEFAULT_WIDGETS = [
   {
     id: 'transactions-default',
     type: 'transactions',
-    component: React.createElement(TransactionsWidget, { key: 'transactions-default' }),
     width: 400,
     height: 350,
     span: 2
@@ -46,7 +59,6 @@ const DEFAULT_WIDGETS = [
   {
     id: 'networkStats-default',
     type: 'networkStats',
-    component: React.createElement(NetworkStatsWidget, { key: 'networkStats-default' }),
     width: 300,
     height: 280,
     span: 1
@@ -57,97 +69,156 @@ export default function Overview() {
   const { connectedAddress, network } = useStore();
   const { isMobile, isTablet } = useResponsive();
   
-  // Persisted widget layout
-  const [widgets, setWidgets] = usePersistedState('dashboard-widgets', DEFAULT_WIDGETS);
+  const [widgets, setWidgets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showWidgetSelector, setShowWidgetSelector] = useState(false);
 
-  // Refresh widget components when data changes
-  const refreshWidgets = () => {
-    const refreshedWidgets = widgets.map(widget => ({
-      ...widget,
-      component: React.createElement(getWidgetComponent(widget.type), { 
-        key: `${widget.type}-${Date.now()}`,
-        onRefresh: () => refreshWidgets()
-      })
+  // 1. Load layout preferences asynchronously on component mount
+  useEffect(() => {
+    async function hydrateDashboardLayout() {
+      try {
+        const savedLayout = await getDashboardLayout();
+        const activeLayoutRules = (savedLayout && savedLayout.length > 0) ? savedLayout : DEFAULT_WIDGETS;
+        
+        // Dynamically append non-serializable React elements using type descriptors
+        const hydratedWidgets = activeLayoutRules.map(widget => ({
+          ...widget,
+          component: React.createElement(getWidgetComponent(widget.type), {
+            key: `${widget.id}-${Date.now()}`,
+            onRefresh: () => refreshWidgets()
+          })
+        }));
+        
+        setWidgets(hydratedWidgets);
+      } catch (error) {
+        console.error("Failed to restore overview widget layout:", error);
+        // Fallback to default layout state if an error is thrown
+        const fallbackWidgets = DEFAULT_WIDGETS.map(widget => ({
+          ...widget,
+          component: React.createElement(getWidgetComponent(widget.type), {
+            key: `${widget.id}-fallback`,
+            onRefresh: () => refreshWidgets()
+          })
+        }));
+        setWidgets(fallbackWidgets);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    hydrateDashboardLayout();
+  }, []);
+
+  // Helper utility to clean non-serializable component properties before writing to store
+  const persistAndSyncLayout = async (updatedWidgets) => {
+    setWidgets(updatedWidgets);
+    
+    const serializedLayout = updatedWidgets.map((w, index) => ({
+      id: w.id,
+      type: w.type,
+      width: w.width,
+      height: w.height,
+      span: w.span,
+      order: index
     }));
-    setWidgets(refreshedWidgets);
+    
+    await saveDashboardLayout(serializedLayout);
+  };
+
+  // Refresh active widget components in-place when layout or data states update
+  const refreshWidgets = () => {
+    setWidgets(prevWidgets => 
+      prevWidgets.map(widget => ({
+        ...widget,
+        component: React.createElement(getWidgetComponent(widget.type), { 
+          key: `${widget.id}-${Date.now()}`,
+          onRefresh: () => refreshWidgets()
+        })
+      }))
+    );
     addBreadcrumb('Dashboard widgets refreshed', 'user_action');
   };
 
-  // Get widget component by type
-  const getWidgetComponent = (type) => {
-    const components = {
-      balance: BalanceWidget,
-      assets: AssetsWidget,
-      transactions: TransactionsWidget,
-      networkStats: NetworkStatsWidget,
-      accountStats: AccountStatsWidget,
-      quickActions: QuickActionsWidget,
-      priceTicker: PriceTickerWidget
-    };
-    return components[type] || BalanceWidget;
-  };
-
-  // Handle layout changes
+  // Handle arrangement layout sequence shifts
   const handleLayoutChange = (newLayout) => {
-    setWidgets(newLayout);
+    persistAndSyncLayout(newLayout);
     addBreadcrumb('Dashboard layout changed', 'user_action', { 
       widgetCount: newLayout.length 
     });
   };
 
-  // Handle widget resize
+  // Handle widget resizing dimensions modification
   const handleWidgetResize = (widget, newSize) => {
     const updatedWidgets = widgets.map(w => 
       w.id === widget.id ? { ...w, ...newSize } : w
     );
-    setWidgets(updatedWidgets);
+    persistAndSyncLayout(updatedWidgets);
     addBreadcrumb('Widget resized', 'user_action', { 
       widgetId: widget.id,
       newSize 
     });
   };
 
-  // Handle widget removal
+  // Handle structural widget node deletions
   const handleWidgetRemove = (widget) => {
     const updatedWidgets = widgets.filter(w => w.id !== widget.id);
-    setWidgets(updatedWidgets);
+    persistAndSyncLayout(updatedWidgets);
     addBreadcrumb('Widget removed', 'user_action', { 
       widgetId: widget.id,
       widgetType: widget.type 
     });
   };
 
-  // Handle adding new widget
+  // Handle adding a new element container node
   const handleAddWidget = (newWidget) => {
-    const updatedWidgets = [...widgets, newWidget];
-    setWidgets(updatedWidgets);
+    const freshWidgetWithElement = {
+      ...newWidget,
+      component: React.createElement(getWidgetComponent(newWidget.type), {
+        key: `${newWidget.id}-${Date.now()}`,
+        onRefresh: () => refreshWidgets()
+      })
+    };
+    const updatedWidgets = [...widgets, freshWidgetWithElement];
+    persistAndSyncLayout(updatedWidgets);
     addBreadcrumb('Widget added', 'user_action', { 
       widgetId: newWidget.id,
       widgetType: newWidget.type 
     });
   };
 
-  // Reset to default layout
+  // Reset to static fallback architecture layout
   const handleResetLayout = () => {
-    setWidgets(DEFAULT_WIDGETS);
+    const factoryResetWidgets = DEFAULT_WIDGETS.map(widget => ({
+      ...widget,
+      component: React.createElement(getWidgetComponent(widget.type), {
+        key: `${widget.id}-${Date.now()}`,
+        onRefresh: () => refreshWidgets()
+      })
+    }));
+    persistAndSyncLayout(factoryResetWidgets);
     setIsEditing(false);
     addBreadcrumb('Dashboard layout reset to default', 'user_action');
   };
 
-  // Toggle edit mode
+  // Toggle layout modification context views
   const toggleEditMode = () => {
     setIsEditing(!isEditing);
     addBreadcrumb(`Dashboard edit mode ${!isEditing ? 'enabled' : 'disabled'}`, 'user_action');
   };
 
-  // Responsive column configuration
   const getColumns = () => {
     if (isMobile) return { mobile: 1, tablet: 1, desktop: 1 };
     if (isTablet) return { mobile: 1, tablet: 2, desktop: 2 };
     return { mobile: 1, tablet: 2, desktop: 3 };
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+        Loading layout choices from user profile...
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
