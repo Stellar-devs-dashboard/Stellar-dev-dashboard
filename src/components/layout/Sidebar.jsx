@@ -95,6 +95,7 @@ export default function Sidebar({ isMobile = false }) {
 
   const sidebarStyles = {
     width: isMobile ? 'var(--sidebar-width-mobile)' : 'var(--sidebar-width)',
+    maxWidth: isMobile ? 'calc(100vw - 24px)' : 'none',
     minHeight: '100vh',
     background: 'var(--bg-surface)',
     borderRight: '1px solid var(--border)',
