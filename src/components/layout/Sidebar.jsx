@@ -25,6 +25,8 @@ const NAV_ITEMS = [
   { id: 'liveActivity', label: 'Live Activity', icon: '⚡' },
   { id: 'cacheStats', label: 'Cache Stats', icon: '⊞' },
   
+  { id: 'performance', label: 'Performance', icon: 'P' },
+  
   { type: 'header', label: 'BUILD' },
   { id: 'builder', label: 'Builder', icon: '⚒' },
   { id: 'txSimulator', label: 'Simulator', icon: '▷' },

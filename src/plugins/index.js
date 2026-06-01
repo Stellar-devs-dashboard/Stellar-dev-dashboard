@@ -83,6 +83,3 @@ export async function registerActivePlugins(manager = pluginManager) {
   return registrationPromise;
 }
 export const pluginManager = new PluginManager();
-}
-
-export { pluginManager };
