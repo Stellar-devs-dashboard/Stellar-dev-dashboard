@@ -1,9 +1,25 @@
 import React, { useEffect } from 'react'
 import { useStore } from '../../lib/store'
+import type { StreamLedger } from '../../lib/store'
 import { connectLedgerStream } from '../../lib/streaming'
 import { format } from 'date-fns'
 
-const STATUS_CONFIG = {
+interface LedgerDisplayEntry {
+  id?: string
+  sequence: number
+  successful_transaction_count: number
+  failed_transaction_count: number
+  operation_count: number
+  closed_at: string
+  [key: string]: unknown
+}
+
+interface StatusConfigEntry {
+  color: string
+  label: string
+}
+
+const STATUS_CONFIG: Record<string, StatusConfigEntry> = {
   connected:     { color: 'var(--green)',  label: 'Live' },
   connecting:    { color: 'var(--amber)',  label: 'Connecting' },
   reconnecting:  { color: 'var(--amber)',  label: 'Reconnecting' },
@@ -24,11 +40,11 @@ export default function RealTimeLedger() {
 
     const cleanup = connectLedgerStream(
       network,
-      (ledger) => {
+      (ledger: Record<string, unknown>) => {
         addStreamLedger(ledger)
         setStreamError(null)
       },
-      (status) => {
+      (status: string) => {
         setStreamStatus(status)
         if (status === 'error') {
           setStreamError('Connection lost – reconnecting…')
@@ -46,14 +62,10 @@ export default function RealTimeLedger() {
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700 }}>
           Real-Time Ledgers
         </div>
-
-        {/* Status badge */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -79,9 +91,7 @@ export default function RealTimeLedger() {
         </div>
       </div>
 
-      {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-        {/* Latest sequence */}
         <div style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
@@ -94,7 +104,6 @@ export default function RealTimeLedger() {
           </div>
         </div>
 
-        {/* Tx count */}
         <div style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
@@ -108,7 +117,6 @@ export default function RealTimeLedger() {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>in last ledger</div>
         </div>
 
-        {/* Op count */}
         <div style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
@@ -123,7 +131,6 @@ export default function RealTimeLedger() {
         </div>
       </div>
 
-      {/* Live ledger feed */}
       <div style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
@@ -160,7 +167,6 @@ export default function RealTimeLedger() {
           </div>
         ) : (
           <div>
-            {/* Table header */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1.2fr 0.8fr 0.8fr 0.8fr 1fr',
@@ -178,7 +184,9 @@ export default function RealTimeLedger() {
               <span>Closed At</span>
             </div>
 
-            {streamLedgers.map((l, i) => (
+            {streamLedgers.map((raw, i) => {
+              const l = raw as LedgerDisplayEntry
+              return (
               <div
                 key={l.id ?? l.sequence}
                 style={{
@@ -190,8 +198,8 @@ export default function RealTimeLedger() {
                   transition: 'var(--transition)',
                   background: i === 0 ? 'var(--cyan-glow)' : 'transparent',
                 }}
-                onMouseEnter={e => { if (i !== 0) e.currentTarget.style.background = 'var(--bg-hover)' }}
-                onMouseLeave={e => { if (i !== 0) e.currentTarget.style.background = 'transparent' }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { if (i !== 0) e.currentTarget.style.background = 'var(--bg-hover)' }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { if (i !== 0) e.currentTarget.style.background = 'transparent' }}
               >
                 <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontWeight: i === 0 ? 700 : 400 }}>
                   {l.sequence?.toLocaleString()}
@@ -209,11 +217,11 @@ export default function RealTimeLedger() {
                   {l.closed_at ? format(new Date(l.closed_at), 'HH:mm:ss') : '—'}
                 </span>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
-
     </div>
   )
 }

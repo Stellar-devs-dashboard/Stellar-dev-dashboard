@@ -1,68 +1,84 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, type ReactNode } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts'
+import type { TooltipProps } from 'recharts'
+import type { ComparisonSlot } from '../../lib/store'
+import type { Horizon } from '@stellar/stellar-sdk'
 import { CHART_COLORS, TOOLTIP_STYLE, AXIS_TICK_STYLE, formatCompactNumber } from '../../lib/chartUtils'
-import { formatXLM } from '../../lib/stellar'
-import { shortAddress } from '../../lib/stellar'
+import { formatXLM, shortAddress } from '../../lib/stellar'
+
+interface ComparisonChartProps {
+  comparisonSlots: ComparisonSlot[]
+}
+
+interface BalanceDatum {
+  name: string
+  [key: string]: number | string
+}
+
+interface ActivityDatum {
+  name: string
+  [key: string]: number | string
+}
+
+interface RadarDatum {
+  metric: string
+  [key: string]: number | string
+}
 
 const SLOT_COLORS = [
   CHART_COLORS.cyan,
   CHART_COLORS.amber,
   CHART_COLORS.green,
   CHART_COLORS.red,
-  '#b388ff' // Extra color for slot 5
+  '#b388ff'
 ]
 
-export default function ComparisonChart({ comparisonSlots }) {
-  // Filter out slots that don't have data yet
+export default function ComparisonChart({ comparisonSlots }: ComparisonChartProps) {
   const activeSlots = comparisonSlots.filter(s => s.data && !s.error && s.key)
 
-  // 1. Bar Chart Data (XLM Balance)
-  const balanceData = useMemo(() => {
+  const balanceData: BalanceDatum[] = useMemo(() => {
     if (activeSlots.length === 0) return []
-    const entry = { name: 'XLM Balance' }
+    const entry: BalanceDatum = { name: 'XLM Balance' }
     activeSlots.forEach((slot, i) => {
-      const balStr = slot.data.balances.find(b => b.asset_type === 'native')?.balance || '0'
+      const balStr = (slot.data as Horizon.AccountResponse).balances.find(b => b.asset_type === 'native')?.balance || '0'
       entry[`slot_${i}`] = parseFloat(balStr)
     })
     return [entry]
   }, [activeSlots])
 
-  // 2. Bar Chart Data (Assets, Subentries)
-  const activityData = useMemo(() => {
+  const activityData: ActivityDatum[] = useMemo(() => {
     if (activeSlots.length === 0) return []
-    const assetsEntry = { name: 'Assets' }
-    const subentriesEntry = { name: 'Subentries' }
+    const assetsEntry: ActivityDatum = { name: 'Assets' }
+    const subentriesEntry: ActivityDatum = { name: 'Subentries' }
     
     activeSlots.forEach((slot, i) => {
-      const otherAssets = slot.data.balances.filter(b => b.asset_type !== 'native')
+      const otherAssets = (slot.data as Horizon.AccountResponse).balances.filter(b => b.asset_type !== 'native')
       assetsEntry[`slot_${i}`] = otherAssets.length
-      subentriesEntry[`slot_${i}`] = slot.data.subentry_count
+      subentriesEntry[`slot_${i}`] = (slot.data as Horizon.AccountResponse).subentry_count
     })
     
     return [assetsEntry, subentriesEntry]
   }, [activeSlots])
 
-  // 3. Radar Chart Data (Normalized Score 0-100)
-  const radarData = useMemo(() => {
+  const radarData: RadarDatum[] = useMemo(() => {
     if (activeSlots.length < 2) return []
 
-    // Helper to get max value of a metric across slots
-    const getMax = (extractFn) => Math.max(...activeSlots.map(s => extractFn(s)), 1)
+    const getMax = (extractFn: (s: typeof activeSlots[0]) => number) => Math.max(...activeSlots.map(s => extractFn(s)), 1)
     
-    const maxBal = getMax(s => parseFloat(s.data.balances.find(b => b.asset_type === 'native')?.balance || '0'))
-    const maxAssets = getMax(s => s.data.balances.filter(b => b.asset_type !== 'native').length)
-    const maxSubentries = getMax(s => s.data.subentry_count)
-    const maxSeq = getMax(s => parseFloat(s.data.sequence || '0'))
-    const maxSigners = getMax(s => s.data.signers?.length || 1)
+    const maxBal = getMax(s => parseFloat((s.data as Horizon.AccountResponse).balances.find(b => b.asset_type === 'native')?.balance || '0'))
+    const maxAssets = getMax(s => (s.data as Horizon.AccountResponse).balances.filter(b => b.asset_type !== 'native').length)
+    const maxSubentries = getMax(s => (s.data as Horizon.AccountResponse).subentry_count)
+    const maxSeq = getMax(s => parseFloat((s.data as Horizon.AccountResponse).sequence || '0'))
+    const maxSigners = getMax(s => (s.data as Horizon.AccountResponse).signers?.length || 1)
 
     return [
-      { metric: 'Balance', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, (parseFloat(s.data.balances.find(b => b.asset_type === 'native')?.balance || '0') / maxBal) * 100])) },
-      { metric: 'Assets', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, (s.data.balances.filter(b => b.asset_type !== 'native').length / maxAssets) * 100])) },
-      { metric: 'Subentries', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, (s.data.subentry_count / maxSubentries) * 100])) },
-      { metric: 'Signers', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, ((s.data.signers?.length || 1) / maxSigners) * 100])) },
+      { metric: 'Balance', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, (parseFloat((s.data as Horizon.AccountResponse).balances.find(b => b.asset_type === 'native')?.balance || '0') / maxBal) * 100])) },
+      { metric: 'Assets', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, ((s.data as Horizon.AccountResponse).balances.filter(b => b.asset_type !== 'native').length / maxAssets) * 100])) },
+      { metric: 'Subentries', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, ((s.data as Horizon.AccountResponse).subentry_count / maxSubentries) * 100])) },
+      { metric: 'Signers', ...Object.fromEntries(activeSlots.map((s, i) => [`slot_${i}`, (((s.data as Horizon.AccountResponse).signers?.length || 1) / maxSigners) * 100])) },
     ]
   }, [activeSlots])
 
@@ -74,8 +90,7 @@ export default function ComparisonChart({ comparisonSlots }) {
     )
   }
 
-  // Custom tooltips
-  const CustomBalanceTooltip = ({ active, payload }) => {
+  const CustomBalanceTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       return (
         <div style={TOOLTIP_STYLE} className="p-3">
@@ -85,7 +100,7 @@ export default function ComparisonChart({ comparisonSlots }) {
               <span style={{ color: entry.color, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                 {shortAddress(activeSlots[idx].key, 4)}:
               </span>
-              <span style={{ fontWeight: 600, fontSize: '13px' }}>{formatXLM(entry.value.toString())} XLM</span>
+              <span style={{ fontWeight: 600, fontSize: '13px' }}>{formatXLM(entry.value?.toString() || '0')} XLM</span>
             </div>
           ))}
         </div>
@@ -94,7 +109,7 @@ export default function ComparisonChart({ comparisonSlots }) {
     return null
   }
 
-  const CustomRadarTooltip = ({ active, payload, label }) => {
+  const CustomRadarTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       return (
         <div style={TOOLTIP_STYLE} className="p-3">
@@ -104,7 +119,7 @@ export default function ComparisonChart({ comparisonSlots }) {
               <span style={{ color: entry.color, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                 {shortAddress(activeSlots[idx].key, 4)}:
               </span>
-              <span style={{ fontWeight: 600, fontSize: '13px' }}>{Math.round(entry.value)}%</span>
+              <span style={{ fontWeight: 600, fontSize: '13px' }}>{Math.round(entry.value || 0)}%</span>
             </div>
           ))}
         </div>
@@ -115,7 +130,6 @@ export default function ComparisonChart({ comparisonSlots }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', animation: 'var(--fade-in)' }}>
-      {/* 1. Bar Chart: Balances */}
       <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', padding: '20px', border: '1px solid var(--border)' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
           Balance Comparison
@@ -128,16 +142,15 @@ export default function ComparisonChart({ comparisonSlots }) {
               <YAxis tick={AXIS_TICK_STYLE} tickFormatter={formatCompactNumber} axisLine={false} tickLine={false} />
               <RechartsTooltip content={<CustomBalanceTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} 
-                formatter={(value, entry, index) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
+                formatter={(_value: string, _entry: unknown, index: number) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
               {activeSlots.map((slot, i) => (
-                <Bar key={slot.key} dataKey={`slot_${i}`} name={`slot_${i}`} fill={SLOT_COLORS[i % SLOT_COLORS.length]} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar key={slot.key} dataKey={`slot_${i}`} name={`slot_${i}`} fill={SLOT_COLORS[i % SLOT_COLORS.length]} radius={[4, 4, 0, 0] as [number, number, number, number]} maxBarSize={40} />
               ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 2. Radar Chart: Relative Metrics (only if 2+ slots) */}
       <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', padding: '20px', border: '1px solid var(--border)' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
           Relative Strength (Normalized)
@@ -147,11 +160,11 @@ export default function ComparisonChart({ comparisonSlots }) {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
                 <PolarGrid stroke="var(--border)" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                <PolarAngleAxis dataKey="metric" tick={{ fill: 'var(--text-secondary)', fontSize: 11 } as React.CSSProperties} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                 <RechartsTooltip content={<CustomRadarTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} 
-                  formatter={(value, entry, index) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
+                <Legend wrapperStyle={{ fontSize: '11px' } as React.CSSProperties}
+                  formatter={(_value: string, _entry: unknown, index: number) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
                 {activeSlots.map((slot, i) => (
                   <Radar key={slot.key} name={`slot_${i}`} dataKey={`slot_${i}`} stroke={SLOT_COLORS[i % SLOT_COLORS.length]} fill={SLOT_COLORS[i % SLOT_COLORS.length]} fillOpacity={0.3} />
                 ))}
@@ -165,7 +178,6 @@ export default function ComparisonChart({ comparisonSlots }) {
         </div>
       </div>
 
-      {/* 3. Bar Chart: Other Metrics */}
       <div style={{ gridColumn: '1 / -1', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', padding: '20px', border: '1px solid var(--border)' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
           Activity & Assets
@@ -176,11 +188,11 @@ export default function ComparisonChart({ comparisonSlots }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="name" tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
               <YAxis tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
-              <RechartsTooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} 
-                formatter={(value, entry, index) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
+              <RechartsTooltip contentStyle={TOOLTIP_STYLE as React.CSSProperties} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' } as React.CSSProperties}
+                formatter={(_value: string, _entry: unknown, index: number) => <span style={{ fontFamily: 'var(--font-mono)' }}>{shortAddress(activeSlots[index]?.key || '', 4)}</span>} />
               {activeSlots.map((slot, i) => (
-                <Bar key={slot.key} dataKey={`slot_${i}`} fill={SLOT_COLORS[i % SLOT_COLORS.length]} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar key={slot.key} dataKey={`slot_${i}`} fill={SLOT_COLORS[i % SLOT_COLORS.length]} radius={[4, 4, 0, 0] as [number, number, number, number]} maxBarSize={40} />
               ))}
             </BarChart>
           </ResponsiveContainer>

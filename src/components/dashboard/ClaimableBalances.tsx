@@ -5,19 +5,56 @@ import {
   formatClaimPredicate,
   isValidPublicKey,
 } from '../../lib/stellar'
-import { buildTransaction, simulateTransaction } from '../../lib/transactionBuilder'
+import type { ClaimableBalanceRecord } from '../../lib/stellar'
+import { simulateTransaction } from '../../lib/transactionBuilder'
+import type { SimulateResult } from '../../lib/stellar'
+
+interface ClaimStateResult extends SimulateResult {
+  minFee?: string
+}
 import CopyableValue from './CopyableValue'
 
-function shortId(id) {
+interface ClaimState {
+  loading?: boolean
+  result?: ClaimStateResult | null
+  error?: string | null
+}
+
+interface RowProps {
+  label: string
+  value?: React.ReactNode
+  mono?: boolean
+  accent?: string
+  copyValue?: string
+}
+
+function shortId(id: string): string {
   return id ? `${id.slice(0, 10)}…${id.slice(-6)}` : '—'
+}
+
+function Row({ label, value, mono = true, accent, copyValue }: RowProps) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', flexShrink: 0 }}>{label}</span>
+      {copyValue ? (
+        <CopyableValue value={copyValue} textStyle={{ fontSize: '12px', color: accent || 'var(--text-primary)', fontFamily: mono ? 'var(--font-mono)' : 'inherit', wordBreak: 'break-all', textAlign: 'right' }}>
+          {value ?? '—'}
+        </CopyableValue>
+      ) : (
+        <span style={{ fontSize: '12px', color: accent || 'var(--text-primary)', fontFamily: mono ? 'var(--font-mono)' : 'inherit', wordBreak: 'break-all', textAlign: 'right' }}>
+          {value ?? '—'}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function ClaimableBalances() {
   const { connectedAddress, network } = useStore()
-  const [balances, setBalances] = useState([])
+  const [balances, setBalances] = useState<ClaimableBalanceRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [claimState, setClaimState] = useState({}) // { [balanceId]: { loading, result, error } }
+  const [error, setError] = useState<string | null>(null)
+  const [claimState, setClaimState] = useState<Record<string, ClaimState>>({})
 
   useEffect(() => {
     if (!connectedAddress || !isValidPublicKey(connectedAddress)) {
@@ -29,12 +66,12 @@ export default function ClaimableBalances() {
     setError(null)
     fetchClaimableBalances(connectedAddress, network)
       .then((records) => { if (active) setBalances(records) })
-      .catch((err) => { if (active) setError(err.message) })
+      .catch((err: Error) => { if (active) setError(err.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [connectedAddress, network])
 
-  async function handleSimulateClaim(balanceId) {
+  async function handleSimulateClaim(balanceId: string) {
     setClaimState((prev) => ({ ...prev, [balanceId]: { loading: true, result: null, error: null } }))
     try {
       const result = await simulateTransaction({
@@ -43,8 +80,9 @@ export default function ClaimableBalances() {
         network,
       })
       setClaimState((prev) => ({ ...prev, [balanceId]: { loading: false, result, error: null } }))
-    } catch (err) {
-      setClaimState((prev) => ({ ...prev, [balanceId]: { loading: false, result: null, error: err.message } }))
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      setClaimState((prev) => ({ ...prev, [balanceId]: { loading: false, result: null, error: message } }))
     }
   }
 
@@ -91,7 +129,6 @@ export default function ClaimableBalances() {
             key={bal.id}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}
           >
-            {/* Header */}
             <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)' }}>
                 <CopyableValue value={bal.id}>{shortId(bal.id)}</CopyableValue>
@@ -101,7 +138,6 @@ export default function ClaimableBalances() {
               </span>
             </div>
 
-            {/* Details */}
             <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Row label="Amount" value={`${parseFloat(bal.amount).toLocaleString()} ${bal.asset.split(':')[0]}`} accent="var(--cyan)" />
               <Row label="Sponsor" value={bal.sponsor} mono copyValue={bal.sponsor} />
@@ -115,7 +151,6 @@ export default function ClaimableBalances() {
               )}
             </div>
 
-            {/* All claimants */}
             {bal.claimants.length > 1 && (
               <details style={{ padding: '0 18px 14px' }}>
                 <summary style={{ fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
@@ -132,7 +167,6 @@ export default function ClaimableBalances() {
               </details>
             )}
 
-            {/* Claim action */}
             <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button
                 onClick={() => handleSimulateClaim(bal.id)}
@@ -164,23 +198,6 @@ export default function ClaimableBalances() {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function Row({ label, value, mono = true, accent, copyValue }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', flexShrink: 0 }}>{label}</span>
-      {copyValue ? (
-        <CopyableValue value={copyValue} textStyle={{ fontSize: '12px', color: accent || 'var(--text-primary)', fontFamily: mono ? 'var(--font-mono)' : 'inherit', wordBreak: 'break-all', textAlign: 'right' }}>
-          {value ?? '—'}
-        </CopyableValue>
-      ) : (
-        <span style={{ fontSize: '12px', color: accent || 'var(--text-primary)', fontFamily: mono ? 'var(--font-mono)' : 'inherit', wordBreak: 'break-all', textAlign: 'right' }}>
-          {value ?? '—'}
-        </span>
-      )}
     </div>
   )
 }

@@ -3,8 +3,9 @@ import { useStore } from '../../lib/store'
 import { useMonitoring } from "../../hooks/useMonitoring";
 import { StatCard } from "./Card";
 import { LatencyTrendChart } from "../charts/AnalyticsChart";
+import type { AlertEntry, MonitoringSnapshot, HealthProbe, NetworkHealthProbe } from "./types";
 
-function AlertRow({ alert, onClear }) {
+function AlertRow({ alert, onClear }: { alert: AlertEntry; onClear: (id: string) => void }) {
   const color =
     alert.severity === "critical"
       ? "var(--red)"
@@ -47,7 +48,7 @@ function AlertRow({ alert, onClear }) {
   );
 }
 
-function ServiceStatus({ label, probe }) {
+function ServiceStatus({ label, probe }: { label: string; probe: HealthProbe }) {
   const color =
     probe.status === "up"
       ? "var(--green)"
@@ -85,16 +86,23 @@ function ServiceStatus({ label, probe }) {
 
 export default function SystemHealth() {
   const { setActiveTab } = useStore()
-  const { snapshot, score, alerts, errors, clearAlert, resetAlerts } = useMonitoring();
+  const { snapshot, score, alerts, errors, clearAlert, resetAlerts } = useMonitoring() as {
+    snapshot: MonitoringSnapshot
+    score: number
+    alerts: AlertEntry[]
+    errors: Array<Record<string, unknown>>
+    clearAlert: (id: string) => void
+    resetAlerts: () => void
+  }
   const memory = snapshot?.memory;
-  const networkHealth = snapshot?.networkHealth || [];
-  const latencyHistory = snapshot?.latencyHistory || [];
+  const networkHealth: NetworkHealthProbe[] = snapshot?.networkHealth || [];
+  const latencyHistory: Array<{ timestamp: number; latency: number }> = snapshot?.latencyHistory || [];
 
   const averageLatency = latencyHistory.length
     ? Math.round(latencyHistory[latencyHistory.length - 1].latency)
     : null;
 
-  const openBreakers = networkHealth.reduce((count, network) => {
+  const openBreakers = networkHealth.reduce((count: number, network: NetworkHealthProbe) => {
     return (
       count +
       (network.horizon.breakerState === "OPEN" ? 1 : 0) +
@@ -138,7 +146,7 @@ export default function SystemHealth() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
         <StatCard label="Networks Probed" value={networkHealth.length} />
         <StatCard label="Open Breakers" value={openBreakers} accent={openBreakers ? "var(--red)" : "var(--cyan)"} />
-        <StatCard label="Probes Last Updated" value={snapshot?.timestamp || "n/a"} />
+        <StatCard label="Last Updated" value={snapshot?.timestamp || "n/a"} />
         <StatCard
           label="Latency History"
           value={latencyHistory.length ? `${latencyHistory.length} points` : "pending"}
@@ -146,17 +154,12 @@ export default function SystemHealth() {
       </div>
 
       {networkHealth.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gap: "12px",
-          }}
-        >
+        <div style={{ display: "grid", gap: "12px" }}>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "13px" }}>Network Probes</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "12px" }}>
-            {networkHealth.map((network) => (
+            {networkHealth.map((netProbe: NetworkHealthProbe) => (
               <div
-                key={network.network}
+                key={netProbe.network}
                 style={{
                   border: "1px solid var(--border)",
                   borderRadius: "var(--radius-lg)",
@@ -165,11 +168,11 @@ export default function SystemHealth() {
                 }}
               >
                 <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "10px" }}>
-                  {network.name}
+                  {netProbe.name}
                 </div>
                 <div style={{ display: "grid", gap: "10px" }}>
-                  <ServiceStatus label="Horizon" probe={network.horizon} />
-                  <ServiceStatus label="Soroban" probe={network.soroban} />
+                  <ServiceStatus label="Horizon" probe={netProbe.horizon} />
+                  <ServiceStatus label="Soroban" probe={netProbe.soroban} />
                 </div>
               </div>
             ))}
@@ -224,7 +227,7 @@ export default function SystemHealth() {
             No active alerts.
           </div>
         )}
-        {alerts.map((alert) => (
+        {alerts.map((alert: AlertEntry) => (
           <AlertRow key={alert.id} alert={alert} onClear={clearAlert} />
         ))}
       </div>

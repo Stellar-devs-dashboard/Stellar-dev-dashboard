@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useStore } from '../../lib/store'
 import { signTransactionWithFreighter } from '../../lib/wallet/freighter'
 import { signXdrWithLedger, isLedgerSupported, getActiveLedgerSession } from '../../lib/wallet/ledger'
 import { NETWORKS } from '../../lib/stellar'
 import { measureAsync } from '../../lib/performanceMonitoring'
 import { loadPreferences, DEFAULT_PREFERENCES } from '../../lib/userPreferences'
+import type { UserPreferences } from '../../lib/userPreferences'
 import Card from './Card'
 import EnhancedTransactionConfirmation from '../security/EnhancedTransactionConfirmation'
 
 export default function TransactionSigner() {
   const { walletConnected, walletType, walletPublicKey, network } = useStore()
   const [xdr, setXdr] = useState('')
-  const [signedXdr, setSignedXdr] = useState(null)
+  const [signedXdr, setSignedXdr] = useState<string | null>(null)
   const [signing, setSigning] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [ledgerPrompt, setLedgerPrompt] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
 
   useEffect(() => {
     async function fetchPreferences() {
@@ -27,7 +29,7 @@ export default function TransactionSigner() {
     fetchPreferences()
   }, [])
 
-  const networkPassphrase = NETWORKS[network]?.passphrase || NETWORKS.testnet.passphrase
+  const networkPassphrase: string = NETWORKS[network]?.passphrase || NETWORKS.testnet.passphrase
 
   const handleSign = async () => {
     if (!xdr.trim()) {
@@ -49,7 +51,7 @@ export default function TransactionSigner() {
     setSignedXdr(null)
 
     try {
-      let result = null
+      let result: string | null = null
 
       if (walletType === 'freighter') {
         const networkName = network === 'mainnet' ? 'PUBLIC' : 'TESTNET'
@@ -60,14 +62,14 @@ export default function TransactionSigner() {
         )
       } else if (walletType === 'ledger') {
         await _signWithLedger()
-        return // _signWithLedger manages its own state
+        return
       } else {
         throw new Error('No wallet connected. Connect a wallet first.')
       }
 
       setSignedXdr(result)
-    } catch (err) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSigning(false)
     }
@@ -83,7 +85,6 @@ export default function TransactionSigner() {
   }
 
   const _signWithLedger = async () => {
-    // Check browser support first
     const supported = await isLedgerSupported()
     if (!supported) {
       setError(
@@ -94,8 +95,6 @@ export default function TransactionSigner() {
       return
     }
 
-    // If we already have a live stellarApp session from WalletConnect, use it.
-    // Otherwise, prompt the user to reconnect via the Wallet tab.
     const { stellarApp, publicKey } = getActiveLedgerSession()
     if (!stellarApp) {
       setError(
@@ -118,9 +117,9 @@ export default function TransactionSigner() {
         ),
         { network, walletType: 'ledger' },
       )
-      setSignedXdr(signed)
-    } catch (err) {
-      setError(err.message)
+      setSignedXdr(signed as string)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLedgerPrompt(false)
       setSigning(false)
@@ -167,7 +166,6 @@ export default function TransactionSigner() {
   return (
     <Card title="Transaction Signer" subtitle={`Signing with ${walletType}`}>
       <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {/* Signer info */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: '10px 12px',
@@ -183,7 +181,6 @@ export default function TransactionSigner() {
           <span style={{ marginLeft: 'auto', opacity: 0.7 }}>{walletType}</span>
         </div>
 
-        {/* Ledger device prompt banner */}
         {ledgerPrompt && (
           <div style={{
             padding: '12px',
@@ -199,7 +196,6 @@ export default function TransactionSigner() {
           </div>
         )}
 
-        {/* XDR input */}
         <div>
           <label style={{
             fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1px',
@@ -209,7 +205,7 @@ export default function TransactionSigner() {
           </label>
           <textarea
             value={xdr}
-            onChange={(e) => setXdr(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setXdr(e.target.value)}
             placeholder="Paste the unsigned transaction XDR envelope here…"
             rows={5}
             style={{
@@ -228,7 +224,6 @@ export default function TransactionSigner() {
           />
         </div>
 
-        {/* Sign button */}
         <button
           onClick={handleSign}
           disabled={signing || !xdr.trim()}
@@ -257,7 +252,6 @@ export default function TransactionSigner() {
           )}
         </button>
 
-        {/* Error */}
         {error && (
           <div style={{
             padding: '12px',
@@ -272,7 +266,6 @@ export default function TransactionSigner() {
           </div>
         )}
 
-        {/* Signed result */}
         {signedXdr && (
           <div>
             <div style={{

@@ -1,43 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../../lib/store';
 import { fetchXLMPrice } from '../../lib/priceFeed';
 import { RefreshCw } from 'lucide-react';
 
 export default function PriceTicker() {
   const { prices, setPrices, setPricesLoading, setPricesError } = useStore();
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const loadPrice = useCallback(async (forceRefresh = false) => {
+    setPricesLoading(true);
+    try {
+      const xlmPrice = await fetchXLMPrice({ forceRefresh });
+      setPrices({ ...prices, XLM: xlmPrice });
+      setLastUpdated(new Date());
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPricesError(message);
+    } finally {
+      setPricesLoading(false);
+    }
+  }, [prices, setPrices, setPricesLoading, setPricesError]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadPrice = async (forceRefresh = false) => {
-      setPricesLoading(true);
-      try {
-        const xlmPrice = await fetchXLMPrice({ forceRefresh });
-        if (!cancelled) {
-          setPrices({ ...prices, XLM: xlmPrice });
-          setLastUpdated(new Date());
-        }
-      } catch (err) {
-        if (!cancelled) setPricesError(err.message);
-      } finally {
-        if (!cancelled) setPricesLoading(false);
-      }
-    };
-
     loadPrice();
 
-    // Refresh every 60 seconds
-    const interval = setInterval(loadPrice, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+    const interval = setInterval(() => loadPrice(), 60_000);
+    return () => clearInterval(interval);
+  }, [loadPrice]);
 
   const xlm = prices?.XLM;
-  const changeColor = xlm?.usd_24h_change >= 0 ? 'var(--green)' : 'var(--red)';
-  const changeSign = xlm?.usd_24h_change >= 0 ? '+' : '';
+  const changeColor = xlm?.usd_24h_change != null && xlm.usd_24h_change >= 0 ? 'var(--green)' : 'var(--red)';
+  const changeSign = xlm?.usd_24h_change != null && xlm.usd_24h_change >= 0 ? '+' : '';
 
   return (
     <div

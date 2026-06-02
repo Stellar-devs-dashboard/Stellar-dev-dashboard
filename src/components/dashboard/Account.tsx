@@ -1,17 +1,19 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { format } from 'date-fns'
+import type { Horizon } from '@stellar/stellar-sdk'
 import { useStore } from '../../lib/store'
 import { shortAddress, formatXLM, fetchAccountCreationDate, fetchAccountOffers, calculateAccountReserves } from '../../lib/stellar'
 import CopyableValue from './CopyableValue'
 import useAssetUsdEstimates, { formatEstimatedUsd } from '../../hooks/useAssetUsdEstimates'
+import type { AccountOffer, ReservesInfo, InfoRowProps } from './types'
 
-function formatAsset(assetType, assetCode) {
+function formatAsset(assetType: string, assetCode?: string): string {
   if (assetType === 'native') return 'XLM'
   return assetCode || 'Unknown'
 }
 
-function InfoRow({ label, value, mono = true, accent, copyValue, secondaryValue }) {
-  const textStyle = {
+function InfoRow({ label, value, mono = true, accent, copyValue, secondaryValue }: InfoRowProps) {
+  const textStyle: React.CSSProperties = {
     fontSize: '12px',
     color: accent || 'var(--text-primary)',
     fontFamily: mono ? 'var(--font-mono)' : 'var(--font-display)',
@@ -49,14 +51,13 @@ function InfoRow({ label, value, mono = true, accent, copyValue, secondaryValue 
 
 export default function Account() {
   const { accountData, connectedAddress, network, networkStats } = useStore()
-  const [offers, setOffers] = useState([])
+  const [offers, setOffers] = useState<AccountOffer[]>([])
   const [offersLoading, setOffersLoading] = useState(false)
-  const [offersError, setOffersError] = useState(null)
-  const [createdAt, setCreatedAt] = useState(null)
+  const [offersError, setOffersError] = useState<string | null>(null)
+  const [createdAt, setCreatedAt] = useState<Date | null>(null)
   const [createdAtLoading, setCreatedAtLoading] = useState(false)
 
-  // Calculate reserves when accountData, networkStats, or offers change
-  const reserves = useMemo(() => {
+  const reserves = useMemo<ReservesInfo | null>(() => {
     if (!accountData) return null
     return calculateAccountReserves(accountData, networkStats, offers.length)
   }, [accountData, networkStats, offers.length])
@@ -79,7 +80,7 @@ export default function Account() {
     setCreatedAt(null)
 
     fetchAccountCreationDate(connectedAddress, network)
-      .then((date) => {
+      .then((date: Date) => {
         if (!isActive) return
         setCreatedAt(date)
       })
@@ -89,11 +90,11 @@ export default function Account() {
       })
 
     fetchAccountOffers(connectedAddress, network)
-      .then((res) => {
+      .then((res: AccountOffer[]) => {
         if (!isActive) return
         setOffers(res)
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (!isActive) return
         setOffersError(err.message)
       })
@@ -111,8 +112,8 @@ export default function Account() {
     <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No account loaded</div>
   )
 
-  const xlm = accountData.balances?.find(b => b.asset_type === 'native')
-  const otherAssets = accountData.balances?.filter(b => b.asset_type !== 'native') || []
+  const xlm = accountData.balances?.find((b: { asset_type: string }) => b.asset_type === 'native')
+  const otherAssets = accountData.balances?.filter((b: { asset_type: string }) => b.asset_type !== 'native') || []
   const signers = accountData.signers || []
   const flags = accountData.flags || {}
   const thresholds = accountData.thresholds || {}
@@ -131,7 +132,7 @@ export default function Account() {
 
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>Identity</div>
-        <InfoRow label="Public Key" value={connectedAddress} copyValue={connectedAddress} />
+        <InfoRow label="Public Key" value={connectedAddress} copyValue={connectedAddress ?? undefined} />
         <InfoRow label="Account ID" value={accountData.account_id} copyValue={accountData.account_id} />
         <InfoRow label="Sequence" value={accountData.sequence} />
         <InfoRow label="Created" value={createdValue} mono={false} />
@@ -224,12 +225,12 @@ export default function Account() {
         {otherAssets.length === 0 ? (
           <div style={{ padding: '16px 18px', fontSize: '12px', color: 'var(--text-muted)' }}>No non-native assets</div>
         ) : (
-          otherAssets.map((asset, index) => {
+          otherAssets.map((asset: Horizon.BalanceLine, index: number) => {
             const estimate = getEstimate(asset)
 
             return (
               <div
-                key={`${asset.asset_type}:${asset.asset_code}:${asset.asset_issuer}`}
+                key={`${asset.asset_type}:${(asset as Horizon.BalanceLineAsset).asset_code}:${(asset as Horizon.BalanceLineAsset).asset_issuer}`}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -241,16 +242,16 @@ export default function Account() {
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {formatAsset(asset.asset_type, asset.asset_code)}
+                    {formatAsset(asset.asset_type, (asset as Horizon.BalanceLineAsset).asset_code)}
                   </div>
-                  {asset.asset_issuer && (
+                  {(asset as Horizon.BalanceLineAsset).asset_issuer && (
                     <CopyableValue
-                      value={asset.asset_issuer}
+                      value={(asset as Horizon.BalanceLineAsset).asset_issuer}
                       title="Copy asset issuer public key"
                       containerStyle={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', fontFamily: 'var(--font-mono)' }}
                       textStyle={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     >
-                      {shortAddress(asset.asset_issuer)}
+                      {shortAddress((asset as Horizon.BalanceLineAsset).asset_issuer)}
                     </CopyableValue>
                   )}
                 </div>
@@ -305,7 +306,7 @@ export default function Account() {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
             Signers ({signers.length})
           </div>
-          {signers.map((s, i) => (
+          {signers.map((s: Horizon.AccountSigner, i: number) => (
             <div key={i} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '10px 18px', borderBottom: i < signers.length - 1 ? '1px solid var(--border)' : 'none',
@@ -372,7 +373,6 @@ export default function Account() {
         )}
       </div>
 
-      {/* Claimable Balances shortcut */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>Claimable Balances</div>

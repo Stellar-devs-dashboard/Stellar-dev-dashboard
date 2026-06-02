@@ -1,16 +1,99 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { useStore } from "../../lib/store";
 import { fetchOrderBook, fetchTrades, parseAssetString } from "../../lib/dex";
+import type { OrderBookEntry, SpreadInfo } from "./types";
 import LiquidityPools from "./LiquidityPools";
 
-function toAsset(assetInput) {
+interface OrderBookData {
+  bids: OrderBookEntry[]
+  asks: OrderBookEntry[]
+}
+
+interface TradeRecord {
+  id: string
+  price?: { n: number; d: number }
+  base_amount?: string
+  ledger_close_time: string
+}
+
+function toAsset(assetInput: string): StellarSdk.Asset {
   if (!assetInput || assetInput === "native" || assetInput === "XLM") {
     return StellarSdk.Asset.native();
   }
   const parsed = parseAssetString(assetInput);
   if (parsed.type === "native") return StellarSdk.Asset.native();
   return new StellarSdk.Asset(parsed.code, parsed.issuer);
+}
+
+function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? "var(--cyan-dim)" : "var(--border)"}`,
+        background: active ? "var(--cyan-glow)" : "transparent",
+        color: active ? "var(--cyan)" : "var(--text-secondary)",
+        borderRadius: "var(--radius-sm)",
+        fontFamily: "var(--font-mono)",
+        fontSize: "12px",
+        padding: "7px 10px",
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
+        padding: "10px",
+      }}
+    >
+      <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: "12px", color: "var(--text-primary)", marginTop: "4px", fontFamily: "var(--font-mono)" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function BookSide({ title, rows, accent }: { title: string; rows: OrderBookEntry[]; accent: string }) {
+  return (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+      <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", color: accent, fontFamily: "var(--font-display)", fontSize: "13px" }}>
+        {title}
+      </div>
+      {rows.length === 0 && (
+        <div style={{ padding: "14px", fontSize: "12px", color: "var(--text-muted)" }}>
+          No levels loaded.
+        </div>
+      )}
+      {rows.map((row, index) => (
+        <div
+          key={`${title}-${index}`}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            borderBottom: "1px solid var(--border)",
+            padding: "8px 14px",
+            fontSize: "11px",
+            fontFamily: "var(--font-mono)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          <span>{row.price}</span>
+          <span>{row.amount}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function DEXExplorer() {
@@ -20,8 +103,8 @@ export default function DEXExplorer() {
   const [buying, setBuying] = useState(
     "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
   );
-  const [book, setBook] = useState(null);
-  const [trades, setTrades] = useState([]);
+  const [book, setBook] = useState<OrderBookData | null>(null);
+  const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +114,7 @@ export default function DEXExplorer() {
     }
   }, []);
 
-  const spread = useMemo(() => {
+  const spread: SpreadInfo | null = useMemo(() => {
     const bestBid = Number(book?.bids?.[0]?.price || 0);
     const bestAsk = Number(book?.asks?.[0]?.price || 0);
     if (!bestBid || !bestAsk) return null;
@@ -57,8 +140,8 @@ export default function DEXExplorer() {
 
       setBook(orderBook);
       setTrades(tradeList);
-    } catch (err) {
-      setError(err.message || "Failed to load DEX data.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load DEX data.");
     } finally {
       setLoading(false);
     }
@@ -102,7 +185,7 @@ export default function DEXExplorer() {
       >
         <input
           value={selling}
-          onChange={(event) => setSelling(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSelling(event.target.value)}
           placeholder='Selling asset (e.g. "native" or "USDC:G...")'
           style={{
             border: "1px solid var(--border)",
@@ -116,7 +199,7 @@ export default function DEXExplorer() {
         />
         <input
           value={buying}
-          onChange={(event) => setBuying(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setBuying(event.target.value)}
           placeholder='Buying asset (e.g. "native" or "USDC:G...")'
           style={{
             border: "1px solid var(--border)",
@@ -181,7 +264,7 @@ export default function DEXExplorer() {
             No trades loaded yet.
           </div>
         )}
-        {trades.map((trade) => (
+        {trades.map((trade: TradeRecord) => (
           <div
             key={trade.id}
             style={{
@@ -202,76 +285,6 @@ export default function DEXExplorer() {
       </div>
         </>
       )}
-    </div>
-  );
-}
-
-function ViewButton({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: `1px solid ${active ? "var(--cyan-dim)" : "var(--border)"}`,
-        background: active ? "var(--cyan-glow)" : "transparent",
-        color: active ? "var(--cyan)" : "var(--text-secondary)",
-        borderRadius: "var(--radius-sm)",
-        fontFamily: "var(--font-mono)",
-        fontSize: "12px",
-        padding: "7px 10px",
-        cursor: "pointer",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-md)",
-        padding: "10px",
-      }}
-    >
-      <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: "12px", color: "var(--text-primary)", marginTop: "4px", fontFamily: "var(--font-mono)" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function BookSide({ title, rows, accent }) {
-  return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-      <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", color: accent, fontFamily: "var(--font-display)", fontSize: "13px" }}>
-        {title}
-      </div>
-      {rows.length === 0 && (
-        <div style={{ padding: "14px", fontSize: "12px", color: "var(--text-muted)" }}>
-          No levels loaded.
-        </div>
-      )}
-      {rows.map((row, index) => (
-        <div
-          key={`${title}-${index}`}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            borderBottom: "1px solid var(--border)",
-            padding: "8px 14px",
-            fontSize: "11px",
-            fontFamily: "var(--font-mono)",
-            color: "var(--text-secondary)",
-          }}
-        >
-          <span>{row.price}</span>
-          <span>{row.amount}</span>
-        </div>
-      ))}
     </div>
   );
 }

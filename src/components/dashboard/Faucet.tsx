@@ -3,6 +3,13 @@ import { useStore } from '../../lib/store'
 import { fundTestnetAccount, isValidPublicKey } from '../../lib/stellar'
 import CopyableValue from './CopyableValue'
 
+interface FaucetResult {
+  success: boolean
+  address?: string
+  data?: unknown
+  error?: string
+}
+
 export default function Faucet() {
   const { connectedAddress, faucetLoading, setFaucetLoading, faucetResult, setFaucetResult } = useStore()
   const [input, setInput] = useState(connectedAddress || '')
@@ -17,8 +24,8 @@ export default function Faucet() {
     try {
       const result = await fundTestnetAccount(addr)
       setFaucetResult({ success: true, address: addr, data: result })
-    } catch (e) {
-      setFaucetResult({ success: false, error: e.message })
+    } catch (e: unknown) {
+      setFaucetResult({ success: false, error: (e as Error).message })
     } finally {
       setFaucetLoading(false)
     }
@@ -31,7 +38,6 @@ export default function Faucet() {
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Fund any testnet account with 10,000 XLM via Friendbot</div>
       </div>
 
-      {/* Fund card */}
       <div style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--amber)',
@@ -61,8 +67,8 @@ export default function Faucet() {
           <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
             <input
               value={input}
-              onChange={e => { setInput(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleFund()}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setInput(e.target.value); setError('') }}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleFund()}
               placeholder="G... public key to fund"
               style={{
                 flex: 1,
@@ -111,7 +117,6 @@ export default function Faucet() {
         </div>
       </div>
 
-      {/* Result */}
       {faucetResult && (
         <div className="animate-in" style={{
           background: 'var(--bg-card)',
@@ -131,7 +136,7 @@ export default function Faucet() {
               <>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Address funded:</div>
                 <CopyableValue
-                  value={faucetResult.address}
+                  value={faucetResult.address ?? ''}
                   title="Copy funded public key"
                   containerStyle={{ fontSize: '13px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: '14px' }}
                   textStyle={{ display: 'inline-block' }}
@@ -149,7 +154,6 @@ export default function Faucet() {
         </div>
       )}
 
-      {/* Info */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '18px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.7 }}>
           <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>About Friendbot</div>

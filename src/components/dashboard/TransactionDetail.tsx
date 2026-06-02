@@ -1,23 +1,34 @@
 import React, { useEffect, useState } from 'react'
+import type { Horizon } from '@stellar/stellar-sdk'
 import { useStore } from '../../lib/store'
 import { fetchTransactionDetails, getOperationLabel, shortAddress } from '../../lib/stellar'
 import { getTransactionUrl } from '../../lib/externalExplorers'
 import CopyableValue from './CopyableValue'
 import { format } from 'date-fns'
 
-export default function TransactionDetail({ txHash, onClose }) {
+interface TransactionDetailData {
+  transaction: Horizon.ServerApi.TransactionRecord
+  operations: Horizon.ServerApi.OperationRecord[]
+}
+
+interface TransactionDetailProps {
+  txHash: string
+  onClose: () => void
+}
+
+export default function TransactionDetail({ txHash, onClose }: TransactionDetailProps) {
   const { network } = useStore()
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
-  
+  const [data, setData] = useState<TransactionDetailData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!txHash) return
-    
+
     let isMounted = true
     setLoading(true)
     setError(null)
-    
+
     fetchTransactionDetails(txHash, network)
       .then(res => {
         if (isMounted) {
@@ -25,13 +36,13 @@ export default function TransactionDetail({ txHash, onClose }) {
           setLoading(false)
         }
       })
-      .catch(err => {
+      .catch((err: Error) => {
         if (isMounted) {
           setError(err.message)
           setLoading(false)
         }
       })
-      
+
     return () => { isMounted = false }
   }, [txHash, network])
 
@@ -57,9 +68,8 @@ export default function TransactionDetail({ txHash, onClose }) {
         display: 'flex',
         flexDirection: 'column',
         animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-      }} onClick={e => e.stopPropagation()}>
-        
-        {/* Header */}
+      }} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+
         <div style={{
           padding: '20px 24px',
           borderBottom: '1px solid var(--border)',
@@ -73,7 +83,7 @@ export default function TransactionDetail({ txHash, onClose }) {
               Transaction Details
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CopyableValue 
+              <CopyableValue
                 value={txHash}
                 textStyle={{ fontSize: '13px', color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}
               >
@@ -102,7 +112,6 @@ export default function TransactionDetail({ txHash, onClose }) {
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}><div className="spinner" /></div>
@@ -112,9 +121,9 @@ export default function TransactionDetail({ txHash, onClose }) {
             </div>
           ) : data && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
+
               <div style={{ display: 'flex', gap: '12px' }}>
-                <a 
+                <a
                   href={getTransactionUrl('stellarExpert', network, txHash)}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -130,24 +139,23 @@ export default function TransactionDetail({ txHash, onClose }) {
                 </a>
               </div>
 
-              {/* Tx Overview */}
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>Overview</h3>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '12px', fontSize: '13px' }}>
                   <div style={{ color: 'var(--text-muted)' }}>Created At</div>
                   <div style={{ color: 'var(--text-primary)' }}>{format(new Date(data.transaction.created_at), 'MMM d, yyyy HH:mm:ss')}</div>
-                  
+
                   <div style={{ color: 'var(--text-muted)' }}>Source Account</div>
                   <div style={{ minWidth: 0 }}>
                     <CopyableValue value={data.transaction.source_account} textStyle={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>
                       {shortAddress(data.transaction.source_account)}
                     </CopyableValue>
                   </div>
-                  
+
                   <div style={{ color: 'var(--text-muted)' }}>Fee Charged</div>
                   <div style={{ color: 'var(--text-primary)' }}>{data.transaction.fee_charged} stroops</div>
-                  
+
                   <div style={{ color: 'var(--text-muted)' }}>Memo</div>
                   <div style={{ color: 'var(--text-primary)', fontFamily: data.transaction.memo_type !== 'none' ? 'var(--font-mono)' : 'inherit', wordBreak: 'break-all' }}>
                     {data.transaction.memo_type === 'none' ? <span style={{ color: 'var(--text-muted)' }}>None</span> : `${data.transaction.memo_type}: ${data.transaction.memo}`}
@@ -158,14 +166,13 @@ export default function TransactionDetail({ txHash, onClose }) {
                 </div>
               </div>
 
-              {/* Operations */}
               <div>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Operations ({data.operations.length})</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {data.operations.map((op, i) => (
+                  {data.operations.map((op: Horizon.ServerApi.OperationRecord, i: number) => (
                     <div key={op.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                       <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ 
+                        <span style={{
                           width: '24px', height: '24px', borderRadius: '50%', background: 'var(--bg-elevated)', border: '1px solid var(--border-bright)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-muted)'
                         }}>

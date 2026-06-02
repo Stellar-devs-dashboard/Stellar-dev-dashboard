@@ -1,7 +1,38 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { pluginManager, registerActivePlugins } from "../../plugins";
-import { PLUGIN_STATUSES } from "../../plugins/PluginManager"; // Import PLUGIN_STATUSES
-function PluginWidgetFrame({ widget }) {
+import { PLUGIN_STATUSES } from "../../plugins/PluginManager";
+
+interface PluginWidget {
+  id: string
+  component: React.ComponentType<Record<string, unknown>>
+  pluginName: string
+  title: string
+  pluginId: string
+  props?: Record<string, unknown>
+}
+
+interface PluginRecord {
+  id: string
+  name: string
+  status: string
+  error?: string
+}
+
+interface PluginSnapshot {
+  plugins: PluginRecord[]
+  widgets: PluginWidget[]
+  dataSources: unknown[]
+}
+
+interface PluginWidgetFrameProps {
+  widget: PluginWidget
+}
+
+interface PluginStatusPillProps {
+  status: string
+}
+
+function PluginWidgetFrame({ widget }: PluginWidgetFrameProps) {
   const Component = widget.component;
 
   return (
@@ -34,8 +65,8 @@ function PluginWidgetFrame({ widget }) {
   );
 }
 
-function PluginStatusPill({ status }) {
-  const colorByStatus = {
+function PluginStatusPill({ status }: PluginStatusPillProps) {
+  const colorByStatus: Record<string, string> = {
     [PLUGIN_STATUSES.INITIALIZED]: "var(--green)",
     [PLUGIN_STATUSES.REGISTERED]: "var(--cyan)",
     [PLUGIN_STATUSES.FAILED]: "var(--red)",
@@ -57,8 +88,8 @@ function PluginStatusPill({ status }) {
   );
 }
 
-export default function PluginRegistryView({ placement = "settings" }) {
-  const [snapshot, setSnapshot] = useState(() => ({
+export default function PluginRegistryView({ placement = "settings" }: { placement?: string }) {
+  const [snapshot, setSnapshot] = useState<PluginSnapshot>(() => ({
     plugins: pluginManager.getPluginRecords(),
     widgets: pluginManager.getWidgets({ placement }),
     dataSources: pluginManager.getDataSources(),
@@ -67,9 +98,9 @@ export default function PluginRegistryView({ placement = "settings" }) {
   useEffect(() => {
     const refresh = () => {
       setSnapshot({
-      plugins: pluginManager.getPluginRecords(),
-      widgets: pluginManager.getWidgets({ placement }),
-      dataSources: pluginManager.getDataSources(),
+        plugins: pluginManager.getPluginRecords(),
+        widgets: pluginManager.getWidgets({ placement }),
+        dataSources: pluginManager.getDataSources(),
       });
     };
 
@@ -78,7 +109,7 @@ export default function PluginRegistryView({ placement = "settings" }) {
   }, [placement]);
 
   useEffect(() => {
-    registerActivePlugins().catch((error) => {
+    registerActivePlugins().catch((error: Error) => {
       console.error("Plugin registration failed", error);
     });
   }, []);
@@ -151,7 +182,7 @@ export default function PluginRegistryView({ placement = "settings" }) {
         )}
       </div>
 
-      {widgets.map((widget) => (
+      {widgets.map((widget: PluginWidget) => (
         <PluginWidgetFrame key={widget.id} widget={widget} />
       ))}
     </section>

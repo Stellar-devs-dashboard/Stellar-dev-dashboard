@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ReactNode } from 'react';
 import { useStore } from '../../lib/store';
 import { shortAddress } from '../../lib/stellar';
 import CopyableValue from './CopyableValue';
@@ -6,11 +6,7 @@ import DashboardGrid from '../layout/DashboardGrid';
 import WidgetSelector from '../layout/WidgetSelector';
 import { useResponsive } from '../../hooks/useResponsive';
 import { addBreadcrumb } from '../../lib/errorReporting';
-
-// Import async layout management hooks from userPreferences
 import { getDashboardLayout, saveDashboardLayout } from '../../lib/userPreferences';
-
-// Import widget components
 import BalanceWidget from '../layout/widgets/BalanceWidget';
 import AssetsWidget from '../layout/widgets/AssetsWidget';
 import TransactionsWidget from '../layout/widgets/TransactionsWidget';
@@ -18,10 +14,14 @@ import NetworkStatsWidget from '../layout/widgets/NetworkStatsWidget';
 import AccountStatsWidget from '../layout/widgets/AccountStatsWidget';
 import QuickActionsWidget from '../layout/widgets/QuickActionsWidget';
 import PriceTickerWidget from '../layout/widgets/PriceTickerWidget';
+import type { WidgetConfig } from './types';
 
-// Get widget component class/function by string identifier
-const getWidgetComponent = (type) => {
-  const components = {
+interface WidgetItem extends WidgetConfig {
+  component: ReactNode
+}
+
+const getWidgetComponent = (type: string): React.ComponentType<Record<string, unknown>> => {
+  const components: Record<string, React.ComponentType<Record<string, unknown>>> = {
     balance: BalanceWidget,
     assets: AssetsWidget,
     transactions: TransactionsWidget,
@@ -33,64 +33,40 @@ const getWidgetComponent = (type) => {
   return components[type] || BalanceWidget;
 };
 
-// Default widget configuration layout fallbacks
-const DEFAULT_WIDGETS = [
-  {
-    id: 'balance-default',
-    type: 'balance',
-    height: 260,
-    span: 1
-  },
-  {
-    id: 'assets-default',
-    type: 'assets',
-    height: 320,
-    span: 1
-  },
-  {
-    id: 'transactions-default',
-    type: 'transactions',
-    height: 360,
-    span: 2
-  },
-  {
-    id: 'networkStats-default',
-    type: 'networkStats',
-    height: 300,
-    span: 1
-  }
+const DEFAULT_WIDGETS: WidgetConfig[] = [
+  { id: 'balance-default', type: 'balance', height: 260, span: 1 },
+  { id: 'assets-default', type: 'assets', height: 320, span: 1 },
+  { id: 'transactions-default', type: 'transactions', height: 360, span: 2 },
+  { id: 'networkStats-default', type: 'networkStats', height: 300, span: 1 }
 ];
 
 export default function Overview() {
   const { connectedAddress, network } = useStore();
   const { isMobile, isTablet, windowWidth } = useResponsive();
-  
-  const [widgets, setWidgets] = useState([]);
+
+  const [widgets, setWidgets] = useState<WidgetItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showWidgetSelector, setShowWidgetSelector] = useState(false);
 
-  // 1. Load layout preferences asynchronously on component mount
   useEffect(() => {
     async function hydrateDashboardLayout() {
       try {
         const savedLayout = await getDashboardLayout();
         const activeLayoutRules = (savedLayout && savedLayout.length > 0) ? savedLayout : DEFAULT_WIDGETS;
-        
-        // Dynamically append non-serializable React elements using type descriptors
-        const hydratedWidgets = activeLayoutRules.map(widget => ({
+
+        const hydratedWidgets: WidgetItem[] = activeLayoutRules.map((widget: WidgetConfig) => ({
           ...widget,
           component: React.createElement(getWidgetComponent(widget.type), {
             key: `${widget.id}-${Date.now()}`,
             onRefresh: () => refreshWidgets()
           })
         }));
-        
+
         setWidgets(hydratedWidgets);
       } catch (error) {
         console.error("Failed to restore overview widget layout:", error);
-        // Fallback to default layout state if an error is thrown
-        const fallbackWidgets = DEFAULT_WIDGETS.map(widget => ({
+        const fallbackWidgets: WidgetItem[] = DEFAULT_WIDGETS.map((widget: WidgetConfig) => ({
           ...widget,
           component: React.createElement(getWidgetComponent(widget.type), {
             key: `${widget.id}-fallback`,
@@ -105,10 +81,9 @@ export default function Overview() {
     hydrateDashboardLayout();
   }, []);
 
-  // Helper utility to clean non-serializable component properties before writing to store
-  const persistAndSyncLayout = async (updatedWidgets) => {
+  const persistAndSyncLayout = async (updatedWidgets: WidgetItem[]) => {
     setWidgets(updatedWidgets);
-    
+
     const serializedLayout = updatedWidgets.map((w, index) => ({
       id: w.id,
       type: w.type,
@@ -116,16 +91,15 @@ export default function Overview() {
       span: Math.max(1, Number(w.span) || 1),
       order: index
     }));
-    
+
     await saveDashboardLayout(serializedLayout);
   };
 
-  // Refresh active widget components in-place when layout or data states update
   const refreshWidgets = () => {
-    setWidgets(prevWidgets => 
-      prevWidgets.map(widget => ({
+    setWidgets(prevWidgets =>
+      prevWidgets.map((widget: WidgetItem) => ({
         ...widget,
-        component: React.createElement(getWidgetComponent(widget.type), { 
+        component: React.createElement(getWidgetComponent(widget.type), {
           key: `${widget.id}-${Date.now()}`,
           onRefresh: () => refreshWidgets()
         })
@@ -134,39 +108,29 @@ export default function Overview() {
     addBreadcrumb('Dashboard widgets refreshed', 'user_action');
   };
 
-  // Handle arrangement layout sequence shifts
-  const handleLayoutChange = (newLayout) => {
+  const handleLayoutChange = (newLayout: WidgetItem[]) => {
     persistAndSyncLayout(newLayout);
-    addBreadcrumb('Dashboard layout changed', 'user_action', { 
-      widgetCount: newLayout.length 
+    addBreadcrumb('Dashboard layout changed', 'user_action', {
+      widgetCount: newLayout.length
     });
   };
 
-  // Handle widget resizing dimensions modification
-  const handleWidgetResize = (widget, newSize) => {
-    const updatedWidgets = widgets.map(w => 
+  const handleWidgetResize = (widget: WidgetItem, newSize: Partial<WidgetItem>) => {
+    const updatedWidgets = widgets.map(w =>
       w.id === widget.id ? { ...w, ...newSize } : w
     );
     persistAndSyncLayout(updatedWidgets);
-    addBreadcrumb('Widget resized', 'user_action', { 
-      widgetId: widget.id,
-      newSize 
-    });
+    addBreadcrumb('Widget resized', 'user_action', { widgetId: widget.id, newSize });
   };
 
-  // Handle structural widget node deletions
-  const handleWidgetRemove = (widget) => {
+  const handleWidgetRemove = (widget: WidgetItem) => {
     const updatedWidgets = widgets.filter(w => w.id !== widget.id);
     persistAndSyncLayout(updatedWidgets);
-    addBreadcrumb('Widget removed', 'user_action', { 
-      widgetId: widget.id,
-      widgetType: widget.type 
-    });
+    addBreadcrumb('Widget removed', 'user_action', { widgetId: widget.id, widgetType: widget.type });
   };
 
-  // Handle adding a new element container node
-  const handleAddWidget = (newWidget) => {
-    const freshWidgetWithElement = {
+  const handleAddWidget = (newWidget: WidgetConfig) => {
+    const freshWidgetWithElement: WidgetItem = {
       ...newWidget,
       component: React.createElement(getWidgetComponent(newWidget.type), {
         key: `${newWidget.id}-${Date.now()}`,
@@ -175,15 +139,11 @@ export default function Overview() {
     };
     const updatedWidgets = [...widgets, freshWidgetWithElement];
     persistAndSyncLayout(updatedWidgets);
-    addBreadcrumb('Widget added', 'user_action', { 
-      widgetId: newWidget.id,
-      widgetType: newWidget.type 
-    });
+    addBreadcrumb('Widget added', 'user_action', { widgetId: newWidget.id, widgetType: newWidget.type });
   };
 
-  // Reset to static fallback architecture layout
   const handleResetLayout = () => {
-    const factoryResetWidgets = DEFAULT_WIDGETS.map(widget => ({
+    const factoryResetWidgets: WidgetItem[] = DEFAULT_WIDGETS.map((widget: WidgetConfig) => ({
       ...widget,
       component: React.createElement(getWidgetComponent(widget.type), {
         key: `${widget.id}-${Date.now()}`,
@@ -195,7 +155,6 @@ export default function Overview() {
     addBreadcrumb('Dashboard layout reset to default', 'user_action');
   };
 
-  // Toggle layout modification context views
   const toggleEditMode = () => {
     setIsEditing(!isEditing);
     addBreadcrumb(`Dashboard edit mode ${!isEditing ? 'enabled' : 'disabled'}`, 'user_action');
@@ -217,18 +176,17 @@ export default function Overview() {
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: isMobile ? 'flex-start' : 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: isMobile ? 'flex-start' : 'center',
         justifyContent: 'space-between',
         flexDirection: isMobile ? 'column' : 'row',
         gap: isMobile ? '16px' : '0'
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ 
-            fontFamily: 'var(--font-display)', 
-            fontSize: isMobile ? '20px' : '22px', 
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: isMobile ? '20px' : '22px',
             fontWeight: 700,
             marginBottom: '4px'
           }}>
@@ -237,29 +195,23 @@ export default function Overview() {
           <CopyableValue
             value={connectedAddress}
             title="Copy connected public key"
-            containerStyle={{ 
-              fontSize: '12px', 
-              color: 'var(--text-muted)', 
-              fontFamily: 'var(--font-mono)' 
+            containerStyle={{
+              fontSize: '12px',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)'
             }}
-            textStyle={{ 
-              maxWidth: isMobile ? '200px' : '260px', 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis', 
-              whiteSpace: 'nowrap' 
+            textStyle={{
+              maxWidth: isMobile ? '200px' : '260px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
             {shortAddress(connectedAddress, 8)}
           </CopyableValue>
         </div>
 
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '12px',
-          flexWrap: 'wrap'
-        }}>
-          {/* Network Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{
             padding: '6px 12px',
             background: network === 'testnet' ? 'var(--amber-glow)' : 'var(--green-glow)',
@@ -274,7 +226,6 @@ export default function Overview() {
             {network}
           </div>
 
-          {/* Dashboard Controls */}
           <div style={{ display: 'flex', gap: '8px' }}>
             {isEditing && (
               <button
@@ -345,7 +296,6 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* Edit Mode Notice */}
       {isEditing && (
         <div style={{
           padding: '12px 16px',
@@ -365,7 +315,6 @@ export default function Overview() {
         </div>
       )}
 
-      {/* Dashboard Grid */}
       <DashboardGrid
         widgets={widgets}
         onLayoutChange={handleLayoutChange}
@@ -377,7 +326,6 @@ export default function Overview() {
         minWidgetHeight={200}
       />
 
-      {/* Widget Selector Modal */}
       <WidgetSelector
         isOpen={showWidgetSelector}
         onClose={() => setShowWidgetSelector(false)}

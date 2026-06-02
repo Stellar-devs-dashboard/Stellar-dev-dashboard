@@ -1,19 +1,31 @@
 import React from 'react';
 import { format } from 'date-fns';
+import type { Horizon } from '@stellar/stellar-sdk';
 import VirtualList from '../common/VirtualList';
 import CopyableValue from './CopyableValue';
 import { shortAddress, getOperationLabel } from '../../lib/stellar';
 
-// Constants for virtualization
 export const TX_ROW_HEIGHT = 86;
 export const OP_ROW_HEIGHT = 74;
 
-/**
- * Optimized Virtualized Transaction List
- */
-export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }) => {
-  const rowHeight = (index, item) => {
-    // Basic dynamic height estimation: add 20px if memo exists
+interface VirtualTxListProps {
+  items: Horizon.ServerApi.TransactionRecord[]
+  network: string
+  onLoadMore?: () => void
+  hasMore?: boolean
+  loading?: boolean
+}
+
+interface VirtualOpListProps {
+  items: Horizon.ServerApi.OperationRecord[]
+  network: string
+  onLoadMore?: () => void
+  hasMore?: boolean
+  loading?: boolean
+}
+
+export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }: VirtualTxListProps) => {
+  const rowHeight = (_index: number, item: Horizon.ServerApi.TransactionRecord) => {
     return item.memo ? TX_ROW_HEIGHT + 20 : TX_ROW_HEIGHT;
   };
 
@@ -25,7 +37,7 @@ export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }) 
       loading={loading}
       containerStyle={{ height: '600px' }}
     >
-      {(tx, index) => (
+      {(tx: Horizon.ServerApi.TransactionRecord, _index: number) => (
         <div
           style={{
             display: 'grid',
@@ -37,8 +49,8 @@ export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }) 
             transition: 'var(--transition)',
             height: '100%',
           }}
-          onMouseEnter={(event) => (event.currentTarget.style.background = 'var(--bg-hover)')}
-          onMouseLeave={(event) => (event.currentTarget.style.background = 'transparent')}
+          onMouseEnter={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'var(--bg-hover)')}
+          onMouseLeave={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'transparent')}
         >
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
@@ -83,7 +95,7 @@ export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }) 
             </div>
             {tx.memo && (
               <div style={{ fontSize: '11px', color: 'var(--amber)', marginLeft: '22px', marginBottom: '2px' }}>
-                memo: {tx.memo}
+                memo: {tx.memo as string}
               </div>
             )}
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '22px' }}>
@@ -115,10 +127,7 @@ export const VirtualTxList = ({ items, network, onLoadMore, hasMore, loading }) 
   );
 };
 
-/**
- * Optimized Virtualized Operation List
- */
-export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }) => {
+export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }: VirtualOpListProps) => {
   return (
     <VirtualList
       items={items}
@@ -127,7 +136,7 @@ export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }) 
       loading={loading}
       containerStyle={{ height: '600px' }}
     >
-      {(op, index) => (
+      {(op: Horizon.ServerApi.OperationRecord, _index: number) => (
         <div
           style={{
             display: 'grid',
@@ -139,8 +148,8 @@ export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }) 
             transition: 'var(--transition)',
             height: '100%',
           }}
-          onMouseEnter={(event) => (event.currentTarget.style.background = 'var(--bg-hover)')}
-          onMouseLeave={(event) => (event.currentTarget.style.background = 'transparent')}
+          onMouseEnter={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'var(--bg-hover)')}
+          onMouseLeave={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'transparent')}
         >
           <div>
             <div style={{ fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>
@@ -159,31 +168,31 @@ export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }) 
                 {getOperationLabel(op.type)}
               </span>
             </div>
-            {op.from && (
+            {'from' in op && op.from && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 <CopyableValue
-                  value={op.from}
+                  value={(op as Record<string, string>).from}
                   title="Copy source public key"
                   textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
                 >
-                  from: {shortAddress(op.from)}
+                  from: {shortAddress((op as Record<string, string>).from)}
                 </CopyableValue>
               </div>
             )}
-            {op.to && (
+            {'to' in op && op.to && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 <CopyableValue
-                  value={op.to}
+                  value={(op as Record<string, string>).to}
                   title="Copy destination public key"
                   textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
                 >
-                  to: {shortAddress(op.to)}
+                  to: {shortAddress((op as Record<string, string>).to)}
                 </CopyableValue>
               </div>
             )}
-            {op.amount && (
+            {'amount' in op && op.amount && (
               <div style={{ fontSize: '11px', color: 'var(--amber)' }}>
-                {parseFloat(op.amount).toFixed(4)} {op.asset_code || 'XLM'}
+                {parseFloat((op as Record<string, string>).amount).toFixed(4)} {'asset_code' in op ? (op as Record<string, string>).asset_code : 'XLM'}
               </div>
             )}
           </div>

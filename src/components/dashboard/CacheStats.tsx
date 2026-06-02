@@ -11,7 +11,7 @@ import {
 
 const REFRESH_MS = 5_000
 
-const ROW_STYLE = {
+const ROW_STYLE: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1.5fr repeat(7, 1fr)',
   gap: '12px',
@@ -20,7 +20,7 @@ const ROW_STYLE = {
   alignItems: 'center',
 }
 
-const HEADER_STYLE = {
+const HEADER_STYLE: React.CSSProperties = {
   ...ROW_STYLE,
   borderBottom: '1px solid var(--border)',
   color: 'var(--text-muted)',
@@ -29,13 +29,13 @@ const HEADER_STYLE = {
   fontSize: '10px',
 }
 
-function formatNumber(n) {
+function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
   return String(n)
 }
 
-function StatusPill({ online }) {
+function StatusPill({ online }: { online: boolean }) {
   return (
     <span
       style={{
@@ -63,8 +63,54 @@ function StatusPill({ online }) {
   )
 }
 
+interface CacheManagerSnapshot {
+  namespace: string
+  size: number
+  maxSize: number
+  hits: number
+  misses: number
+  hitRate: string
+  writes: number
+  evictions: number
+  persist: boolean
+  offline: boolean
+}
+
+interface CacheSnapshot {
+  managers: CacheManagerSnapshot[]
+  storage: { appState: number; apiCache: number; offlineQueue: number }
+}
+
+function Stat({ label, value, accent }: { label: string; value: string | number | null | undefined; accent?: boolean }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: '10px',
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          marginBottom: '6px',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '22px',
+          fontWeight: 700,
+          color: accent ? 'var(--cyan, #06b6d4)' : 'var(--text-primary)',
+        }}
+      >
+        {value ?? '—'}
+      </div>
+    </div>
+  )
+}
+
 export default function CacheStats() {
-  const [snapshot, setSnapshot] = useState({ managers: [], storage: { appState: 0, apiCache: 0, offlineQueue: 0 } })
+  const [snapshot, setSnapshot] = useState<CacheSnapshot>({ managers: [], storage: { appState: 0, apiCache: 0, offlineQueue: 0 } })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const { stats: rateLimiterStats } = useRateLimiter()
@@ -84,7 +130,7 @@ export default function CacheStats() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleClear = async (which) => {
+  const handleClear = async (which: string) => {
     setBusy(true)
     try {
       if (which === 'stellar') stellarCacheManager.clear()
@@ -111,9 +157,9 @@ export default function CacheStats() {
     }
   }
 
-  const totalEntries = snapshot.managers.reduce((sum, m) => sum + m.size, 0)
-  const totalHits = snapshot.managers.reduce((sum, m) => sum + m.hits, 0)
-  const totalMisses = snapshot.managers.reduce((sum, m) => sum + m.misses, 0)
+  const totalEntries = snapshot.managers.reduce((sum: number, m) => sum + m.size, 0)
+  const totalHits = snapshot.managers.reduce((sum: number, m) => sum + m.hits, 0)
+  const totalMisses = snapshot.managers.reduce((sum: number, m) => sum + m.misses, 0)
   const overallRate =
     totalHits + totalMisses === 0
       ? '0.0%'
@@ -224,34 +270,6 @@ export default function CacheStats() {
           <Stat label="Offline queue" value={snapshot.storage.offlineQueue} />
         </div>
       </Card>
-    </div>
-  )
-}
-
-function Stat({ label, value, accent }) {
-  return (
-    <div>
-      <div
-        style={{
-          fontSize: '10px',
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          marginBottom: '6px',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: accent ? 'var(--cyan, #06b6d4)' : 'var(--text-primary)',
-        }}
-      >
-        {value ?? '—'}
-      </div>
     </div>
   )
 }

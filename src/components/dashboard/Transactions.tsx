@@ -386,20 +386,6 @@ export default function Transactions() {
             />
           ) : (
             <>
-              {filteredTransactions.map((tx, i) => (
-                <div key={tx.id} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  gap: '12px',
-                  alignItems: 'center',
-                  padding: '12px 18px',
-                  borderBottom: i < filteredTransactions.length - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'var(--transition)',
-                  cursor: 'pointer',
-                }}
-                onClick={() => setSelectedTxHash(tx.hash)}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               {filteredTransactions.map((tx, index) => (
                 <div
                   key={tx.id}

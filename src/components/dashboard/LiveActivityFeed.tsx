@@ -10,7 +10,7 @@ const CHANNELS = [
   { id: 'transactions', label: 'Transactions' },
 ]
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   idle: 'var(--text-muted)',
   connecting: 'var(--cyan, #06b6d4)',
   connected: 'var(--success, #22c55e)',
@@ -19,25 +19,24 @@ const STATUS_COLORS = {
   disconnected: 'var(--text-muted)',
 }
 
-// Milliseconds before marking stream as stale (no messages received)
 const STALE_STREAM_THRESHOLD_MS = 10_000
 
-function formatTime(ts) {
+function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString()
 }
 
-function describeEvent(event) {
+function describeEvent(event: { channel: string; record?: Record<string, unknown> }): string {
   const r = event.record ?? {}
   if (event.channel === 'payments') {
-    const amount = r.amount ?? '?'
-    const asset = r.asset_code ?? 'XLM'
-    return `${amount} ${asset}: ${truncate(r.from)} → ${truncate(r.to)}`
+    const amount = (r.amount as string) ?? '?'
+    const asset = (r.asset_code as string) ?? 'XLM'
+    return `${amount} ${asset}: ${truncate(r.from as string)} → ${truncate(r.to as string)}`
   }
   if (event.channel === 'effects') {
     return `${r.type ?? 'effect'} ${r.amount ? `(${r.amount} ${r.asset_code ?? 'XLM'})` : ''}`
   }
   if (event.channel === 'operations') {
-    return `${r.type ?? 'operation'} #${(r.id ?? '').toString().slice(0, 12)}`
+    return `${r.type ?? 'operation'} #${((r.id ?? '').toString()).slice(0, 12)}`
   }
   if (event.channel === 'transactions') {
     const ops = r.operation_count ?? '?'
@@ -46,26 +45,15 @@ function describeEvent(event) {
   return JSON.stringify(r).slice(0, 80)
 }
 
-function truncate(s) {
+function truncate(s: unknown): string {
   if (!s || typeof s !== 'string') return '—'
   if (s.length <= 12) return s
   return `${s.slice(0, 5)}…${s.slice(-4)}`
 }
 
-/**
- * Real-time, account-scoped activity feed. Shows a unified timeline of incoming
- * events (effects, payments, operations, transactions) for the connected account.
- *
- * Features:
- * - Multi-channel event subscription (effects, payments, operations, transactions)
- * - Automatic unsubscription on account/network change or component unmount
- * - Stale-stream warning when no messages received for threshold duration
- * - Sorted unified feed across all channels
- * - Status indicator with reconnection support
- */
 export default function LiveActivityFeed() {
   const { connectedAddress, network } = useStore()
-  const [selectedChannels, setSelectedChannels] = useState(['effects', 'payments'])
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(['effects', 'payments'])
   const [isStale, setIsStale] = useState(false)
 
   const { events, status, lastEventAt, errored } = useAccountStream(
@@ -78,15 +66,12 @@ export default function LiveActivityFeed() {
     },
   )
 
-  // Track stream staleness: after status becomes 'connected', check if we receive
-  // messages within the threshold. If not, mark as stale.
   useEffect(() => {
     if (status !== 'connected' || !lastEventAt) {
       setIsStale(false)
       return
     }
 
-    // Set timer to check for staleness
     const checkStale = setTimeout(() => {
       const timeSinceLastEvent = Date.now() - lastEventAt
       if (timeSinceLastEvent > STALE_STREAM_THRESHOLD_MS) {
@@ -97,15 +82,14 @@ export default function LiveActivityFeed() {
     return () => clearTimeout(checkStale)
   }, [status, lastEventAt])
 
-  // Clear events and reset state when account/network changes
   useEffect(() => {
     setIsStale(false)
   }, [connectedAddress, network])
 
-  const toggleChannel = (id) => {
+  const toggleChannel = (id: string) => {
     setSelectedChannels((prev) => {
       if (prev.includes(id)) {
-        if (prev.length === 1) return prev // never empty
+        if (prev.length === 1) return prev
         return prev.filter((c) => c !== id)
       }
       return [...prev, id]
@@ -239,7 +223,7 @@ export default function LiveActivityFeed() {
             Waiting for new {selectedChannels.join(', ')} events…
           </div>
         ) : (
-          events.map((event, idx) => (
+          events.map((event: { pagingToken: string; receivedAt: number; channel: string; record?: Record<string, unknown> }, idx: number) => (
             <div
               key={`${event.pagingToken}-${idx}`}
               style={{

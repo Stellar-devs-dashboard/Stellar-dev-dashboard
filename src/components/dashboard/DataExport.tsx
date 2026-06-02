@@ -1,16 +1,21 @@
-/**
- * DataExport component (#114).
- *
- * Provides a UI panel for exporting dashboard data as JSON/CSV
- * and importing a previously saved backup file.
- */
-
-import React, { useRef } from "react";
+import React, { useRef, type ReactNode } from "react";
 import { useDataExport } from "../../hooks/useDataExport";
 import { useStore } from "../../lib/store";
 
-function ActionButton({ onClick, disabled, children, variant = "primary" }) {
-  const base = {
+interface ActionButtonProps {
+  onClick: () => void
+  disabled?: boolean
+  children: ReactNode
+  variant?: "primary" | "secondary"
+}
+
+interface StatusMessageProps {
+  error?: string | null
+  success?: boolean
+}
+
+function ActionButton({ onClick, disabled, children, variant = "primary" }: ActionButtonProps) {
+  const base: React.CSSProperties = {
     padding: "9px 18px",
     borderRadius: "var(--radius-md)",
     fontSize: "12px",
@@ -24,7 +29,7 @@ function ActionButton({ onClick, disabled, children, variant = "primary" }) {
     alignItems: "center",
     gap: "6px",
   };
-  const styles =
+  const styles: React.CSSProperties =
     variant === "primary"
       ? { ...base, background: "var(--cyan)", color: "#000" }
       : { ...base, background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--border-bright)" };
@@ -35,7 +40,7 @@ function ActionButton({ onClick, disabled, children, variant = "primary" }) {
   );
 }
 
-function StatusMessage({ error, success }) {
+function StatusMessage({ error, success }: StatusMessageProps) {
   if (!error && !success) return null;
   return (
     <div
@@ -56,7 +61,7 @@ function StatusMessage({ error, success }) {
 }
 
 export default function DataExport() {
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { transactions, account } = useStore();
   const {
     isExporting,
@@ -70,7 +75,7 @@ export default function DataExport() {
     importBackup,
   } = useDataExport();
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       importBackup(file);
@@ -90,7 +95,6 @@ export default function DataExport() {
         padding: "4px",
       }}
     >
-      {/* ── Export section ── */}
       <div
         style={{
           background: "var(--bg-card)",
@@ -140,7 +144,6 @@ export default function DataExport() {
         </div>
       </div>
 
-      {/* ── Import section ── */}
       <div
         style={{
           background: "var(--bg-card)",

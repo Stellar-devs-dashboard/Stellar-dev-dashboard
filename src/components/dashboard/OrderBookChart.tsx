@@ -7,11 +7,17 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  type TooltipProps,
 } from "recharts";
+import type { OrderBookEntry, OrderBookChartPoint } from "./types";
 
-export default function OrderBookChart({ bids = [], asks = [] }) {
-  // Prepare data for visualization
-  const bidData = bids.slice(0, 20).map((bid, i) => ({
+interface OrderBookChartProps {
+  bids?: OrderBookEntry[]
+  asks?: OrderBookEntry[]
+}
+
+export default function OrderBookChart({ bids = [], asks = [] }: OrderBookChartProps) {
+  const bidData: OrderBookChartPoint[] = bids.slice(0, 20).map((bid, i) => ({
     price: parseFloat(bid.price),
     amount: parseFloat(bid.amount),
     cumulative: bids
@@ -20,7 +26,7 @@ export default function OrderBookChart({ bids = [], asks = [] }) {
     type: "bid",
   }));
 
-  const askData = asks.slice(0, 20).map((ask, i) => ({
+  const askData: OrderBookChartPoint[] = asks.slice(0, 20).map((ask, i) => ({
     price: parseFloat(ask.price),
     amount: parseFloat(ask.amount),
     cumulative: asks
@@ -75,12 +81,12 @@ export default function OrderBookChart({ bids = [], asks = [] }) {
             dataKey="price"
             stroke="var(--text-muted)"
             style={{ fontSize: "11px" }}
-            tickFormatter={(value) => value.toFixed(4)}
+            tickFormatter={(value: number) => value.toFixed(4)}
           />
           <YAxis
             stroke="var(--text-muted)"
             style={{ fontSize: "11px" }}
-            tickFormatter={(value) => value.toFixed(2)}
+            tickFormatter={(value: number) => value.toFixed(2)}
           />
           <Tooltip
             contentStyle={{
@@ -89,7 +95,7 @@ export default function OrderBookChart({ bids = [], asks = [] }) {
               borderRadius: "var(--radius-md)",
               fontSize: "12px",
             }}
-            formatter={(value, name) => [value.toFixed(4), name]}
+            formatter={(value: number, name: string) => [value.toFixed(4), name]}
           />
           <Area
             type="stepAfter"

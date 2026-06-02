@@ -2,8 +2,9 @@ import React from "react";
 import { useAnalytics } from "../../hooks/useAnalytics";
 import AnalyticsChart from "../charts/AnalyticsChart";
 import { StatCard } from "./Card";
+import type { AlertEntry } from "./types";
 
-function RiskItem({ signal }) {
+function RiskItem({ signal }: { signal: AlertEntry }) {
   const color =
     signal.severity === "high"
       ? "var(--red)"
@@ -32,7 +33,7 @@ export default function Analytics() {
   const account = analytics?.account || {};
   const tx = analytics?.transactions || {};
   const network = analytics?.network || {};
-  const risks = analytics?.risks || [];
+  const risks: AlertEntry[] = analytics?.risks || [];
 
   return (
     <div className="animate-in" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>

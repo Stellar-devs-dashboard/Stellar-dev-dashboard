@@ -7,7 +7,7 @@ import {
   getContractUrl,
 } from "../../lib/externalExplorers";
 
-function Panel({ title, subtitle, children }) {
+function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -50,7 +50,7 @@ function Panel({ title, subtitle, children }) {
   );
 }
 
-function LabeledField({ label, children }) {
+function LabeledField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <span
@@ -68,7 +68,7 @@ function LabeledField({ label, children }) {
   );
 }
 
-function textInputStyle() {
+function textInputStyle(): React.CSSProperties {
   return {
     width: "100%",
     background: "var(--bg-elevated)",
@@ -91,7 +91,7 @@ export default function ExplorerEmbed() {
   const [resourceId, setResourceId] = useState("");
   const [selectedExplorer, setSelectedExplorer] = useState("stellarExpert");
 
-  function getExplorerUrl() {
+  function getExplorerUrl(): string | null {
     if (!resourceId.trim()) return null;
 
     switch (resourceType) {
@@ -138,7 +138,7 @@ export default function ExplorerEmbed() {
           <LabeledField label="Resource Type">
             <select
               value={resourceType}
-              onChange={(e) => setResourceType(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setResourceType(e.target.value)}
               style={textInputStyle()}
             >
               <option value="account">Account</option>
@@ -150,7 +150,7 @@ export default function ExplorerEmbed() {
           <LabeledField label="Explorer">
             <select
               value={selectedExplorer}
-              onChange={(e) => setSelectedExplorer(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedExplorer(e.target.value)}
               style={textInputStyle()}
             >
               {Object.entries(EXPLORERS).map(([key, explorer]) => (
@@ -166,7 +166,7 @@ export default function ExplorerEmbed() {
           >
             <input
               value={resourceId}
-              onChange={(e) => setResourceId(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResourceId(e.target.value)}
               placeholder={`Enter ${resourceType} ID`}
               style={textInputStyle()}
             />

@@ -1,9 +1,29 @@
-import React, { useState } from "react";
-import { simulateTransaction, formatXLM } from "../../lib/stellar";
+import React, { useState, type ReactNode } from "react";
+import { simulateTransaction } from "../../lib/stellar";
+import type { SimulateResult } from "../../lib/stellar";
 import { useStore } from "../../lib/store";
 import { getErrorMessage } from "../../lib/errorHandling/ErrorMessages";
 
-function Panel({ title, subtitle, children }) {
+interface PanelProps {
+  title: string
+  subtitle?: string
+  children: ReactNode
+}
+
+interface ResultBlockProps {
+  label: string
+  data: unknown
+}
+
+interface TransactionParams {
+  sourceAccount?: string
+  operations?: Array<Record<string, unknown>>
+  baseFee?: number
+  timeBounds?: Record<string, unknown>
+  network?: string
+}
+
+function Panel({ title, subtitle, children }: PanelProps) {
   return (
     <div
       style={{
@@ -46,7 +66,7 @@ function Panel({ title, subtitle, children }) {
   );
 }
 
-function ResultBlock({ label, data }) {
+function ResultBlock({ label, data }: ResultBlockProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div
@@ -84,9 +104,12 @@ function ResultBlock({ label, data }) {
 export default function TransactionSimulator({
   transactionParams: propParams,
   onSimulate,
+}: {
+  transactionParams?: TransactionParams
+  onSimulate?: (result: SimulateResult) => void
 }) {
   const { connectedAddress, network } = useStore();
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<SimulateResult | null>(null);
   const [loading, setLoading] = useState(false);
 
   const transactionParams = propParams || {
@@ -100,7 +123,7 @@ export default function TransactionSimulator({
   async function handleSimulate() {
     if (!transactionParams.sourceAccount) {
       const err = getErrorMessage('validation');
-      setResult({ success: false, errors: [err.message] });
+      setResult({ success: false, errors: [err.message], fee: 0, operationCount: 0 });
       return;
     }
 
@@ -109,9 +132,9 @@ export default function TransactionSimulator({
       const simResult = await simulateTransaction(transactionParams);
       setResult(simResult);
       if (onSimulate) onSimulate(simResult);
-    } catch (error) {
+    } catch (error: unknown) {
       const err = getErrorMessage('stellar');
-      setResult({ success: false, errors: [error.message || err.message] });
+      setResult({ success: false, errors: [error instanceof Error ? error.message : err.message], fee: 0, operationCount: 0 });
     } finally {
       setLoading(false);
     }
@@ -164,7 +187,7 @@ export default function TransactionSimulator({
               >
                 Errors
               </div>
-              {result.errors.map((error, i) => (
+              {result.errors.map((error: string, i: number) => (
                 <div
                   key={i}
                   style={{
@@ -262,14 +285,24 @@ export default function TransactionSimulator({
                       marginBottom: "4px",
                     }}
                   >
-                      {result.hash?.slice(0, 16)}...
+                    Hash
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      fontFamily: "var(--font-mono)",
+                    }}
+                  >
+                    {result.hash?.slice(0, 16)}...
                   </div>
                 </div>
               </div>
 
               {result.sorobanMetrics && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                     Soroban Resources
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
