@@ -23,7 +23,7 @@ export default function MobileChartContainer({
 }: MobileChartContainerProps) {
   const { isMobile } = useResponsive()
   const [zoom, setZoom] = useState(1)
-  const { ref: zoomRef, scale, reset } = usePinchZoom({
+  const { ref: zoomRef, scale, reset } = usePinchZoom<HTMLDivElement>({
     minScale: 0.7,
     maxScale: 3,
     onScaleChange: (s) => setZoom(s),

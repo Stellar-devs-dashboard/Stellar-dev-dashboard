@@ -15,13 +15,13 @@ export default function MobileOptimizationDemo() {
   const [swipeCount, setSwipeCount] = useState({ left: 0, right: 0 })
 
   // Swipe gesture demo
-  const swipeRef = useSwipeGesture({
+  const swipeRef = useSwipeGesture<HTMLDivElement>({
     onSwipeLeft: () => setSwipeCount(c => ({ ...c, left: c.left + 1 })),
     onSwipeRight: () => setSwipeCount(c => ({ ...c, right: c.right + 1 })),
   })
 
   // Pinch zoom demo
-  const { ref: zoomRef, scale, reset } = usePinchZoom({
+  const { ref: zoomRef, scale, reset } = usePinchZoom<HTMLDivElement>({
     minScale: 0.5,
     maxScale: 3,
   })

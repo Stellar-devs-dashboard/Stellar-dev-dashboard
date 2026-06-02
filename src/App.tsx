@@ -311,7 +311,7 @@ function DashboardLayout() {
   }
 
   // Swipe right from the left edge to open the mobile sidebar
-  const swipeAreaRef = useSwipeGesture<HTMLDivElement>({
+  const swipeAreaRef = useSwipeGesture<HTMLElement>({
     onSwipeRight: useCallback(() => {
       if (isMobile && !isMobileMenuOpen) setMobileMenuOpen(true)
     }, [isMobile, isMobileMenuOpen, setMobileMenuOpen]),
