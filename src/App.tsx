@@ -49,6 +49,10 @@ import ClaimableBalances from './components/dashboard/ClaimableBalances'
 import AlertRules from './components/dashboard/AlertRules'
 import RealTimeNotificationCenter from './components/notifications/RealTimeNotificationCenter'
 import { useRealTimeNotifications } from './hooks/useRealTimeNotifications'
+import { Webhooks } from './components/dashboard/Webhooks'
+import { LearningHub } from './components/dashboard/LearningHub'
+import { HardwareWalletSecurity } from './components/dashboard/HardwareWalletSecurity'
+import { TemplateLibrary } from './components/dashboard/TemplateLibrary'
 import { pruneCaches } from './lib/cacheManager'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useStore } from './lib/store'
@@ -130,7 +134,10 @@ const TABS: Record<string, TabComponent> = {
   cacheStats: CacheStats,
   liveActivity: LiveActivityFeed,
   claimableBalances: ClaimableBalances,
-  alertRules: AlertRules,
+  webhooks: Webhooks,
+  learningHub: LearningHub,
+  hardwareWalletSecurity: HardwareWalletSecurity,
+  templateLibrary: TemplateLibrary,
 }
 
 function NotificationBell({ onClick }: { onClick: () => void }) {
