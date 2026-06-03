@@ -29,7 +29,7 @@ jobs:
           # Add other env vars as needed
 
       - name: Deploy to Vercel (Recommended)
-        uses: amondnet/vercel-action@v25
+        uses: amondnet/vercel-action@v42
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
