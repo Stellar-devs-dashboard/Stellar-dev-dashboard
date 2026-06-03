@@ -5,9 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Video, Code, Award, CheckCircle, Play, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { learningHub, Tutorial, UserProgress } from '../../lib/learningHub';
 
 export const LearningHub: React.FC = () => {
+  const { t } = useTranslation();
   const [tutorials, setTutorials] = useState<Tutorial[]>([]);
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [selectedTutorial, setSelectedTutorial] = useState<Tutorial | null>(null);
@@ -43,7 +45,7 @@ export const LearningHub: React.FC = () => {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <div className="spinner" />
-        <p>Loading learning hub...</p>
+        <p>{t('learningHub.loading')}</p>
       </div>
     );
   }
@@ -65,9 +67,9 @@ export const LearningHub: React.FC = () => {
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
       <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Learning Hub</h1>
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{t('learningHub.title')}</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          Master Stellar blockchain development with interactive tutorials, quizzes, and certifications
+          {t('learningHub.subtitle')}
         </p>
       </div>
 
@@ -81,14 +83,14 @@ export const LearningHub: React.FC = () => {
             marginBottom: '2rem',
           }}
         >
-          <StatCard icon={Award} label="Level" value={progress.level.toString()} color="var(--primary)" />
+          <StatCard icon={Award} label={t('learningHub.stat.level')} value={progress.level.toString()} color="var(--primary)" />
           <StatCard
             icon={CheckCircle}
-            label="Completed"
+            label={t('learningHub.stat.completed')}
             value={`${progress.completedTutorials.length}/${tutorials.length}`}
             color="var(--success)"
           />
-          <StatCard icon={BookOpen} label="Points" value={progress.totalPoints.toString()} color="var(--info)" />
+          <StatCard icon={BookOpen} label={t('learningHub.stat.points')} value={progress.totalPoints.toString()} color="var(--info)" />
         </div>
       )}
 
@@ -110,7 +112,7 @@ export const LearningHub: React.FC = () => {
               transition: 'all 0.2s',
             }}
           >
-            {category}
+            {t(`learningHub.category.${category}`)}
           </button>
         ))}
       </div>
@@ -137,7 +139,7 @@ export const LearningHub: React.FC = () => {
             border: '1px dashed var(--border)',
           }}
         >
-          <p style={{ color: 'var(--text-secondary)' }}>No tutorials found in this category</p>
+          <p style={{ color: 'var(--text-secondary)' }}>{t('learningHub.tutorial.noFound')}</p>
         </div>
       )}
     </div>
@@ -174,6 +176,7 @@ const TutorialCard: React.FC<{
   isCompleted: boolean;
   onSelect: () => void;
 }> = ({ tutorial, isCompleted, onSelect }) => {
+  const { t } = useTranslation();
   const difficultyColors = {
     beginner: 'var(--success)',
     intermediate: 'var(--warning)',
@@ -237,7 +240,7 @@ const TutorialCard: React.FC<{
               textTransform: 'capitalize',
             }}
           >
-            {tutorial.difficulty}
+            {t(`learningHub.tutorial.difficulty.${tutorial.difficulty}`)}
           </span>
           <span
             style={{
@@ -248,7 +251,7 @@ const TutorialCard: React.FC<{
               color: 'var(--text-secondary)',
             }}
           >
-            {tutorial.duration} min
+            {t('learningHub.tutorial.duration', { min: tutorial.duration })}
           </span>
         </div>
         <ChevronRight size={18} color="var(--text-secondary)" />
@@ -263,6 +266,7 @@ const TutorialView: React.FC<{
   onBack: () => void;
   isCompleted: boolean;
 }> = ({ tutorial, userId, onBack, isCompleted }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'content' | 'playground' | 'quiz'>('content');
   const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
@@ -270,7 +274,7 @@ const TutorialView: React.FC<{
 
   const handleQuizSubmit = async () => {
     if (!tutorial.quiz || quizAnswers.length !== tutorial.quiz.questions.length) {
-      alert('Please answer all questions');
+      alert(t('learningHub.quiz.answerAll'));
       return;
     }
 
@@ -299,7 +303,7 @@ const TutorialView: React.FC<{
           gap: '0.5rem',
         }}
       >
-        ← Back to Hub
+        {t('learningHub.back')}
       </button>
 
       <div style={{ marginBottom: '2rem' }}>
@@ -318,7 +322,7 @@ const TutorialView: React.FC<{
                 gap: '0.25rem',
               }}
             >
-              <CheckCircle size={14} /> Completed
+              <CheckCircle size={14} /> {t('learningHub.tutorial.completed')}
             </span>
           )}
         </div>
@@ -328,20 +332,20 @@ const TutorialView: React.FC<{
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
         <TabButton
-          label="Content"
+          label={t('learningHub.tabs.content')}
           icon={BookOpen}
           active={activeTab === 'content'}
           onClick={() => setActiveTab('content')}
         />
         <TabButton
-          label="Playground"
+          label={t('learningHub.tabs.playground')}
           icon={Code}
           active={activeTab === 'playground'}
           onClick={() => setActiveTab('playground')}
         />
         {tutorial.quiz && (
           <TabButton
-            label="Quiz"
+            label={t('learningHub.tabs.quiz')}
             icon={Award}
             active={activeTab === 'quiz'}
             onClick={() => setActiveTab('quiz')}
@@ -385,9 +389,9 @@ const TutorialView: React.FC<{
 
       {activeTab === 'playground' && (
         <div style={{ background: 'var(--card-bg)', padding: '2rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Interactive Code Playground</h3>
+          <h3 style={{ marginBottom: '1rem' }}>{t('learningHub.playground.title')}</h3>
           <textarea
-            placeholder="Write your Stellar code here..."
+            placeholder={t('learningHub.playground.placeholder')}
             style={{
               width: '100%',
               minHeight: '300px',
@@ -411,14 +415,14 @@ const TutorialView: React.FC<{
               cursor: 'pointer',
             }}
           >
-            Run Code
+            {t('learningHub.playground.run')}
           </button>
         </div>
       )}
 
       {activeTab === 'quiz' && tutorial.quiz && (
         <div style={{ background: 'var(--card-bg)', padding: '2rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-          <h3 style={{ marginBottom: '1.5rem' }}>Test Your Knowledge</h3>
+          <h3 style={{ marginBottom: '1.5rem' }}>{t('learningHub.quiz.testKnowledge')}</h3>
           {tutorial.quiz.questions.map((question, qIndex) => (
             <div key={question.id} style={{ marginBottom: '2rem' }}>
               <p style={{ fontWeight: 600, marginBottom: '1rem' }}>
@@ -472,7 +476,7 @@ const TutorialView: React.FC<{
                 cursor: 'pointer',
               }}
             >
-              Submit Quiz
+              {t('learningHub.quiz.submit')}
             </button>
           ) : (
             <div
@@ -484,10 +488,14 @@ const TutorialView: React.FC<{
               }}
             >
               <h4 style={{ marginBottom: '0.5rem' }}>
-                {quizResult?.passed ? '🎉 Congratulations!' : '😔 Keep Learning'}
+                {quizResult?.passed ? t('learningHub.quiz.passed') : t('learningHub.quiz.failed')}
               </h4>
               <p>
-                You scored {Math.round(quizResult?.score * 100)}% ({quizResult?.score * quizResult?.totalQuestions} / {quizResult?.totalQuestions})
+                {t('learningHub.quiz.score', {
+                  percent: Math.round(quizResult?.score * 100),
+                  correct: Math.round(quizResult?.score * quizResult?.totalQuestions),
+                  total: quizResult?.totalQuestions,
+                })}
               </p>
             </div>
           )}

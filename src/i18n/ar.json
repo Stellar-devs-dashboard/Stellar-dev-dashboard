@@ -235,5 +235,52 @@
             "manageOffer": "إدارة العرض",
             "setOptions": "تعيين الخيارات"
         }
+    },
+    "learningHub": {
+        "title": "مركز التعلم",
+        "subtitle": "أتقن تطوير بلوكشين ستيلار من خلال دروس تفاعلية، اختبارات وشهادات",
+        "loading": "جارِ تحميل مركز التعلم...",
+        "category": {
+            "all": "الكل",
+            "basics": "الأساسيات",
+            "advanced": "المتقدم",
+            "soroban": "soroban",
+            "assets": "الأصول",
+            "payments": "المدفوعات"
+        },
+        "stat": {
+            "level": "المستوى",
+            "completed": "المكتمل",
+            "points": "النقاط"
+        },
+        "tutorial": {
+            "noFound": "لم يتم العثور على دروس في هذه الفئة",
+            "difficulty": {
+                "beginner": "مبتدئ",
+                "intermediate": "متوسط",
+                "advanced": "متقدم"
+            },
+            "duration": "{{min}} دقيقة",
+            "completed": "مكتمل"
+        },
+        "tabs": {
+            "content": "المحتوى",
+            "playground": "ملعب",
+            "quiz": "اختبار"
+        },
+        "back": "← العودة إلى المركز",
+        "quiz": {
+            "testKnowledge": "اختبر معرفتك",
+            "answerAll": "يرجى الإجابة على جميع الأسئلة",
+            "submit": "إرسال الاختبار",
+            "passed": "🎉 تهانينا!",
+            "failed": "😔 استمر في التعلم",
+            "score": "حصلت على {{percent}}% ({{correct}} من {{total}})"
+        },
+        "playground": {
+            "title": "ملعب الكود التفاعلي",
+            "placeholder": "اكتب كود ستيلار الخاص بك هنا...",
+            "run": "تشغيل الكود"
+        }
     }
 }

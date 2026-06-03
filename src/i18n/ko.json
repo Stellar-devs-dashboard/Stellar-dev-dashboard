@@ -235,5 +235,52 @@
             "manageOffer": "오퍼 관리",
             "setOptions": "옵션 설정"
         }
+    },
+    "learningHub": {
+        "title": "학습 센터",
+        "subtitle": "대화형 튜토리얼, 퀴즈, 인증을 통해 Stellar 블록체인 개발을 마스터하세요",
+        "loading": "학습 센터 로딩 중...",
+        "category": {
+            "all": "전체",
+            "basics": "기초",
+            "advanced": "고급",
+            "soroban": "soroban",
+            "assets": "자산",
+            "payments": "지불"
+        },
+        "stat": {
+            "level": "레벨",
+            "completed": "완료",
+            "points": "포인트"
+        },
+        "tutorial": {
+            "noFound": "이 카테고리에 튜토리얼이 없습니다",
+            "difficulty": {
+                "beginner": "초보",
+                "intermediate": "중급",
+                "advanced": "고급"
+            },
+            "duration": "{{min}}분",
+            "completed": "완료"
+        },
+        "tabs": {
+            "content": "내용",
+            "playground": "플레이그라운드",
+            "quiz": "퀴즈"
+        },
+        "back": "← 센터로 돌아가기",
+        "quiz": {
+            "testKnowledge": "지식 테스트",
+            "answerAll": "모든 질문에 답해 주세요",
+            "submit": "퀴즈 제출",
+            "passed": "🎉 축하합니다!",
+            "failed": "😔 계속 학습하세요",
+            "score": "{{percent}}% 맞췄습니다 ({{correct}}/{{total}})"
+        },
+        "playground": {
+            "title": "대화형 코드 플레이그라운드",
+            "placeholder": "여기에 Stellar 코드를 작성하세요...",
+            "run": "코드 실행"
+        }
     }
 }

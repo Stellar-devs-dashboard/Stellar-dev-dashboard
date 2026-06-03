@@ -235,5 +235,52 @@
             "manageOffer": "オファーを管理",
             "setOptions": "オプション設定"
         }
+    },
+    "learningHub": {
+        "title": "学習センター",
+        "subtitle": "インタラクティブなチュートリアル、クイズ、認定資格でStellarブロックチェーン開発をマスター",
+        "loading": "学習センターを読み込み中...",
+        "category": {
+            "all": "すべて",
+            "basics": "基礎",
+            "advanced": "上級",
+            "soroban": "soroban",
+            "assets": "資産",
+            "payments": "支払い"
+        },
+        "stat": {
+            "level": "レベル",
+            "completed": "完了",
+            "points": "ポイント"
+        },
+        "tutorial": {
+            "noFound": "このカテゴリにチュートリアルが見つかりません",
+            "difficulty": {
+                "beginner": "初心者",
+                "intermediate": "中級",
+                "advanced": "上級"
+            },
+            "duration": "{{min}}分",
+            "completed": "完了"
+        },
+        "tabs": {
+            "content": "コンテンツ",
+            "playground": "プレイグラウンド",
+            "quiz": "クイズ"
+        },
+        "back": "← センターに戻る",
+        "quiz": {
+            "testKnowledge": "知識をテスト",
+            "answerAll": "すべての質問に回答してください",
+            "submit": "クイズを送信",
+            "passed": "🎉 おめでとうございます！",
+            "failed": "😔 学習を続けましょう",
+            "score": "{{percent}}%正解です（{{correct}}/{{total}}）"
+        },
+        "playground": {
+            "title": "インタラクティブコードプレイグラウンド",
+            "placeholder": "ここにStellarコードを記入してください...",
+            "run": "コードを実行"
+        }
     }
 }
