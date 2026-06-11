@@ -1369,6 +1369,18 @@ export function isValidPublicKey(key: string): boolean {
   return false;
 }
 
+export type AccountDetails = StellarSdk.Horizon.AccountResponse;
+
+export function fetchAccountDetails(
+  publicKey: string,
+  network: NetworkName = 'testnet'
+): Promise<AccountDetails> {
+  return fetchAccount(publicKey, network);
+}
+
+/** @deprecated Use isValidPublicKey */
+export const isPublicKey = isValidPublicKey;
+
 export function isValidContractId(id: string): boolean {
   try {
     StellarSdk.Address.fromString(id);

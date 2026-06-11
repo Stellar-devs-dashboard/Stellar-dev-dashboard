@@ -173,16 +173,12 @@ export interface StoreState {
   setStreamError: (e: string | null) => void
 }
 
-export const useStore = create<StoreState>((set, get) => ({
-  network: 'testnet',
 // ─── Persisted keys ───────────────────────────────────────────────────────────
 const PERSIST_KEYS: Array<keyof StoreState> = [
   'network', 'theme', 'activeTab', 'savedSearches', 'multiSigMode', 'searchFilters',
-  'notificationHistory', 'unreadNotificationCount'
+  'notificationHistory', 'unreadNotificationCount',
 ]
 const STORE_PERSIST_KEY = 'store:preferences'
-
-// ─── Store ────────────────────────────────────────────────────────────────────
 
 // LocalStorage key for quick network persistence (synchronous, survives reload)
 const SELECTED_NETWORK_KEY = 'stellar:selected-network'
@@ -324,12 +320,9 @@ export const useStore = create<StoreState>((set, get) => ({
   setPricesLoading: (loading) => set({ pricesLoading: loading }),
   setPricesError: (error) => set({ pricesError: error }),
 
-  searchFilters: { status: 'all', memoOnly: false, minFee: '', maxFee: '', type: '' },
-  setSearchFilters: (filters) => set((state) => ({ searchFilters: { ...state.searchFilters, ...filters } })),
-  // Search Filters
   searchFilters: DEFAULT_SEARCH_FILTERS,
   setSearchFilters: (filters) => set((state) => ({
-    searchFilters: { ...state.searchFilters, ...filters }
+    searchFilters: { ...state.searchFilters, ...filters },
   })),
 
   comparisonSlots: [],
@@ -364,15 +357,13 @@ export const useStore = create<StoreState>((set, get) => ({
   disconnectWallet: () => set({ walletConnected: false, walletType: null, walletPublicKey: null }),
 
   notifications: [],
-  addNotification: (n) => set((state) => ({ notifications: [n, ...state.notifications] })),
-  removeNotification: (id) => set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) })),
   notificationHistory: [],
   unreadNotificationCount: 0,
   addNotification: (notification) => set((state) => ({
-    notifications: [...state.notifications, notification]
+    notifications: [notification, ...state.notifications],
   })),
   removeNotification: (id) => set((state) => ({
-    notifications: state.notifications.filter(n => n.id !== id)
+    notifications: state.notifications.filter(n => n.id !== id),
   })),
   addNotificationHistory: (notification) => set((state) => ({
     notificationHistory: [{...notification, read: false}, ...state.notificationHistory],

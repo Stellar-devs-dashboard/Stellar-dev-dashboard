@@ -63,7 +63,6 @@ export default function TourLauncher() {
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 4px 20px rgba(99,102,241,0.5)',
           color: '#fff',
-          position: 'relative',
         }}
       >
         <svg 

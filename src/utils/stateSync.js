@@ -10,16 +10,84 @@
  *   initStateSync(useStore);
  */
 
+import { setStoredValue } from '../lib/storage.js';
+
 const CHANNEL_NAME = 'stellar-dashboard-sync';
+const STORAGE_CHANNEL_NAME = 'stellar-dashboard-storage-sync';
 const SYNC_VERSION = 1;
 
 // Fields that are safe to broadcast (no private keys, no secrets).
 const ALLOWED_KEYS = ['network', 'activeTab', 'connectedAddress', 'theme'];
 
 let channel = null;
+let storageChannel = null;
 let storeRef = null;
 let unsubscribe = null;
 let _ignoreNextUpdate = false; // prevent echo loop
+const storageListeners = new Set();
+
+function getStorageChannel() {
+  if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return null;
+  if (storageChannel) return storageChannel;
+
+  storageChannel = new BroadcastChannel(STORAGE_CHANNEL_NAME);
+  storageChannel.onmessage = (event) => {
+    const { type, key, value } = event.data || {};
+    if (type !== 'STORAGE_UPDATE' || !key) return;
+    storageListeners.forEach((callback) => {
+      try {
+        callback(key, value);
+      } catch (err) {
+        console.warn('[stateSync] Storage listener error:', err);
+      }
+    });
+  };
+
+  return storageChannel;
+}
+
+/**
+ * Persist a value and notify other tabs.
+ * @param {string} key
+ * @param {*} value
+ */
+export async function syncState(key, value) {
+  await setStoredValue(key, value);
+  const ch = getStorageChannel();
+  if (ch) ch.postMessage({ type: 'STORAGE_UPDATE', key, value });
+}
+
+/**
+ * Subscribe to cross-tab storage updates.
+ * @param {(key: string, value: unknown) => void} callback
+ * @returns {() => void} unsubscribe
+ */
+export function onStateChange(callback) {
+  storageListeners.add(callback);
+  getStorageChannel();
+  return () => storageListeners.delete(callback);
+}
+
+/**
+ * Merge local and incoming persisted values (last-writer-wins for scalars).
+ * @param {*} local
+ * @param {*} incoming
+ * @returns {*}
+ */
+export function resolveStateConflict(local, incoming) {
+  if (incoming === null || incoming === undefined) return local;
+  if (
+    typeof local === 'object' &&
+    local !== null &&
+    typeof incoming === 'object' &&
+    incoming !== null &&
+    !Array.isArray(local) &&
+    !Array.isArray(incoming)
+  ) {
+    return { ...local, ...incoming };
+  }
+  return incoming;
+}
 
 /**
  * Encode only the safe slice of state for broadcasting.
