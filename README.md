@@ -8,6 +8,8 @@ A real-time, open-source developer dashboard for the Stellar network — built w
 
 Connect a Stellar public key or wallet and explore accounts, transactions, Soroban contracts, network stats, and transaction tooling — all in the browser. No backend required; data comes from public Horizon and Soroban RPC endpoints.
 
+**Live demo:** [stellar-dev-dashboard.netlify.app](https://stellar-dev-dashboard.netlify.app)
+
 ---
 
 ## Architecture
@@ -126,6 +128,7 @@ Switching networks in the sidebar resets account-specific state.
 | --- | --- |
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
+| `npm run build:pages` | Production build for GitHub Pages (subpath + SPA fallback) |
 | `npm run build:analyze` | Build + bundle treemap (`dist/stats.html`) |
 | `npm test` | Run Vitest unit tests |
 | `npm run test:e2e` | Run Playwright E2E tests |
@@ -133,6 +136,21 @@ Switching networks in the sidebar resets account-specific state.
 | `npm run type-check` | TypeScript check |
 
 CI enforces a **500 KB gzipped** bundle budget on the main entry chunk.
+
+---
+
+## Deployment
+
+**Production:** [https://stellar-dev-dashboard.netlify.app](https://stellar-dev-dashboard.netlify.app) (Netlify)
+
+```bash
+npm run build
+netlify deploy --prod --dir=dist
+```
+
+Netlify config lives in [`netlify.toml`](netlify.toml) (build command, publish dir, SPA redirects).
+
+Alternative targets: [GitHub Pages](.github/workflows/pages.yml) (`npm run build:pages`) or [Vercel](.github/workflows/deploy.yml) (requires `VERCEL_*` secrets).
 
 ---
 

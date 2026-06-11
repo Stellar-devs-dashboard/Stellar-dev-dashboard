@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:pages": "GITHUB_PAGES=true vite build && cp dist/index.html dist/404.html",
     "build:analyze": "ANALYZE=1 vite build",
     "preview": "vite preview",
     "lint": "eslint .",

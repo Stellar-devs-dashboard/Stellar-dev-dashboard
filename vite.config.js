@@ -2,8 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 
+const pagesBase =
+  process.env.GITHUB_PAGES === 'true' ? '/Stellar-dev-dashboard/' : '/'
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: pagesBase,
   plugins: [
     react(),
     // Bundle analysis: run `ANALYZE=1 npm run build` to generate dist/stats.html

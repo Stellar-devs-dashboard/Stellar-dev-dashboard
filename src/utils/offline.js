@@ -75,6 +75,8 @@ function notifyInstallPromptListeners(available) {
  */
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+  // Service worker shell paths are root-scoped; skip on GitHub Pages subpath deploys.
+  if (import.meta.env.BASE_URL !== '/') return;
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
