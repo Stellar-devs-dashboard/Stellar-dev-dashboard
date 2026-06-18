@@ -252,6 +252,8 @@ function sanitizeMetadata(metadata = {}) {
     const normalizedKey = String(key).toLowerCase();
     if (
       normalizedKey.includes("secret") ||
+      normalizedKey.includes("privatekey") ||
+      normalizedKey.includes("private_key") ||
       normalizedKey.includes("xdr") ||
       normalizedKey.includes("token") ||
       normalizedKey.includes("address") ||

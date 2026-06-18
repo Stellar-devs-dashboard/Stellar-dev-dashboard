@@ -1,7 +1,21 @@
 
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { getServer, NETWORKS, isValidPublicKey } from "./stellar";
-import { createOperation, buildTransaction, signAndSubmitTransaction } from "./transactionBuilder";
+import { buildTransaction, signAndSubmitTransaction } from "./transactionBuilder";
+import { SecretKeyHandle } from "./SecretKeyHandle";
+import type { NetworkName } from "./stellar";
+
+async function signWithSecretHandle(
+  transaction: StellarSdk.Transaction,
+  secretKey: string,
+  network: NetworkName | string,
+) {
+  const handle = SecretKeyHandle.fromSecret(secretKey);
+  try {
+    return await signAndSubmitTransaction(transaction, handle, network);
+  } finally {
+    handle.destroy();
+  }
+}
 
 export interface BulkOperationStatus {
   id: string;
@@ -126,7 +140,7 @@ export class BulkOperationManager {
             network,
           });
 
-          const result = await signAndSubmitTransaction(transaction, secretKey, network);
+          const result = await signWithSecretHandle(transaction, secretKey, network);
 
           return {
             id: `op-${index}`,
@@ -173,7 +187,7 @@ export class BulkOperationManager {
             network,
           });
 
-          const result = await signAndSubmitTransaction(transaction, secretKey, network);
+          const result = await signWithSecretHandle(transaction, secretKey, network);
 
           return {
             id: `op-${index}`,
@@ -249,7 +263,7 @@ export class BulkOperationManager {
             network,
           });
 
-          const rollbackResult = await signAndSubmitTransaction(
+          const rollbackResult = await signWithSecretHandle(
             reverseTransaction,
             secretKey,
             network
@@ -319,7 +333,7 @@ export class BulkOperationManager {
             network,
           });
 
-          const rollbackResult = await signAndSubmitTransaction(
+          const rollbackResult = await signWithSecretHandle(
             rollbackTransaction,
             secretKey,
             network
