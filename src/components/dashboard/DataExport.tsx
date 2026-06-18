@@ -62,7 +62,7 @@ function StatusMessage({ error, success }: StatusMessageProps) {
 
 export default function DataExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { transactions, account } = useStore();
+  const { transactions, accountData } = useStore();
   const {
     isExporting,
     isImporting,
@@ -83,7 +83,7 @@ export default function DataExport() {
     }
   };
 
-  const balances = account?.balances ?? [];
+  const balances = accountData?.balances ?? [];
   const txList = transactions ?? [];
 
   return (

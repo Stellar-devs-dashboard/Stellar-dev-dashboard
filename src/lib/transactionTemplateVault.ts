@@ -1,5 +1,5 @@
-import { encrypt, decrypt } from './encryption.js'
-import { getEncryptedValue, setEncryptedValue } from './storage.js'
+import { encrypt, decrypt } from './encryption'
+import { getEncryptedValue, setEncryptedValue } from './storage'
 
 export interface TransactionTemplateOperation {
   type: string

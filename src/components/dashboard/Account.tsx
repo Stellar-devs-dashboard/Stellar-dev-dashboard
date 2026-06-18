@@ -7,6 +7,24 @@ import CopyableValue from './CopyableValue'
 import useAssetUsdEstimates, { formatEstimatedUsd } from '../../hooks/useAssetUsdEstimates'
 import type { AccountOffer, ReservesInfo, InfoRowProps } from './types'
 
+type BalanceLine = Horizon.AccountResponse['balances'][number]
+type AccountSigner = Horizon.AccountResponse['signers'][number]
+
+function isCreditBalance(balance: BalanceLine): balance is Extract<BalanceLine, { asset_code: string }> {
+  return balance.asset_type === 'credit_alphanum4' || balance.asset_type === 'credit_alphanum12'
+}
+
+function mapOfferRecord(offer: Horizon.ServerApi.OfferRecord): AccountOffer {
+  return {
+    id: String(offer.id),
+    amount: offer.amount,
+    price: offer.price,
+    price_r: offer.price_r,
+    selling: offer.selling,
+    buying: offer.buying,
+  }
+}
+
 function formatAsset(assetType: string, assetCode?: string): string {
   if (assetType === 'native') return 'XLM'
   return assetCode || 'Unknown'
@@ -54,7 +72,7 @@ export default function Account() {
   const [offers, setOffers] = useState<AccountOffer[]>([])
   const [offersLoading, setOffersLoading] = useState(false)
   const [offersError, setOffersError] = useState<string | null>(null)
-  const [createdAt, setCreatedAt] = useState<Date | null>(null)
+  const [createdAt, setCreatedAt] = useState<string | null>(null)
   const [createdAtLoading, setCreatedAtLoading] = useState(false)
 
   const reserves = useMemo<ReservesInfo | null>(() => {
@@ -80,7 +98,7 @@ export default function Account() {
     setCreatedAt(null)
 
     fetchAccountCreationDate(connectedAddress, network)
-      .then((date: Date) => {
+      .then((date) => {
         if (!isActive) return
         setCreatedAt(date)
       })
@@ -90,13 +108,13 @@ export default function Account() {
       })
 
     fetchAccountOffers(connectedAddress, network)
-      .then((res: AccountOffer[]) => {
+      .then((records) => {
         if (!isActive) return
-        setOffers(res)
+        setOffers(records.map(mapOfferRecord))
       })
-      .catch((err: Error) => {
+      .catch((err: unknown) => {
         if (!isActive) return
-        setOffersError(err.message)
+        setOffersError(err instanceof Error ? err.message : 'Failed to load offers')
       })
       .finally(() => {
         if (!isActive) return
@@ -112,17 +130,17 @@ export default function Account() {
     <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No account loaded</div>
   )
 
-  const xlm = accountData.balances?.find((b: { asset_type: string }) => b.asset_type === 'native')
-  const otherAssets = accountData.balances?.filter((b: { asset_type: string }) => b.asset_type !== 'native') || []
+  const xlm = accountData.balances?.find((b) => b.asset_type === 'native')
+  const otherAssets = accountData.balances?.filter((b) => b.asset_type !== 'native') || []
   const signers = accountData.signers || []
   const flags = accountData.flags || {}
-  const thresholds = accountData.thresholds || {}
+  const thresholds = accountData.thresholds
   const createdValue = createdAtLoading ? 'Loading...' : createdAt ? format(new Date(createdAt), 'MMM d, yyyy') : 'Unknown'
   const { getEstimate } = useAssetUsdEstimates({
     balances: accountData?.balances || [],
     connectedAddress,
     network,
-    refreshKey: accountData,
+    refreshKey: accountData.sequence,
   })
   const xlmEstimate = xlm ? getEstimate(xlm) : null
 
@@ -225,12 +243,12 @@ export default function Account() {
         {otherAssets.length === 0 ? (
           <div style={{ padding: '16px 18px', fontSize: '12px', color: 'var(--text-muted)' }}>No non-native assets</div>
         ) : (
-          otherAssets.map((asset: Horizon.BalanceLine, index: number) => {
+          otherAssets.map((asset: BalanceLine, index: number) => {
             const estimate = getEstimate(asset)
 
             return (
               <div
-                key={`${asset.asset_type}:${(asset as Horizon.BalanceLineAsset).asset_code}:${(asset as Horizon.BalanceLineAsset).asset_issuer}`}
+                key={`${asset.asset_type}:${isCreditBalance(asset) ? asset.asset_code : 'native'}:${isCreditBalance(asset) ? asset.asset_issuer : ''}`}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -242,16 +260,16 @@ export default function Account() {
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {formatAsset(asset.asset_type, (asset as Horizon.BalanceLineAsset).asset_code)}
+                    {formatAsset(asset.asset_type, isCreditBalance(asset) ? asset.asset_code : undefined)}
                   </div>
-                  {(asset as Horizon.BalanceLineAsset).asset_issuer && (
+                  {isCreditBalance(asset) && asset.asset_issuer && (
                     <CopyableValue
-                      value={(asset as Horizon.BalanceLineAsset).asset_issuer}
+                      value={asset.asset_issuer}
                       title="Copy asset issuer public key"
                       containerStyle={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', fontFamily: 'var(--font-mono)' }}
                       textStyle={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     >
-                      {shortAddress((asset as Horizon.BalanceLineAsset).asset_issuer)}
+                      {shortAddress(asset.asset_issuer)}
                     </CopyableValue>
                   )}
                 </div>
@@ -306,7 +324,7 @@ export default function Account() {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
             Signers ({signers.length})
           </div>
-          {signers.map((s: Horizon.AccountSigner, i: number) => (
+          {signers.map((s: AccountSigner, i: number) => (
             <div key={i} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '10px 18px', borderBottom: i < signers.length - 1 ? '1px solid var(--border)' : 'none',

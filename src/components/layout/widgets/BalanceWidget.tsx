@@ -15,7 +15,7 @@ export default function BalanceWidget({ onRefresh }: BaseWidgetProps) {
     balances: accountData?.balances || [],
     connectedAddress,
     network,
-    refreshKey: accountData,
+    refreshKey: accountData?.account_id ?? connectedAddress ?? '',
   });
 
   const xlmBalance = accountData?.balances?.find((b: any) => b.asset_type === 'native');

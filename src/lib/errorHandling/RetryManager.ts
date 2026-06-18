@@ -146,8 +146,8 @@ export class OfflineQueue {
 
     // Also write to IDB so the entry survives a reload
     try {
-      const { enqueueOfflineOp } = await import('../storage.js')
-      await enqueueOfflineOp({ id, label, priority })
+      const { enqueueOfflineOp } = await import('../storage')
+      await enqueueOfflineOp({ type: 'offline_queue', payload: { label, priority } })
     } catch { /* IDB may not be available in tests */ }
   }
 

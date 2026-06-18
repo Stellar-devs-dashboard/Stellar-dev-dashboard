@@ -10,13 +10,6 @@ interface OrderBookData {
   asks: OrderBookEntry[]
 }
 
-interface TradeRecord {
-  id: string
-  price?: { n: number; d: number }
-  base_amount?: string
-  ledger_close_time: string
-}
-
 function toAsset(assetInput: string): StellarSdk.Asset {
   if (!assetInput || assetInput === "native" || assetInput === "XLM") {
     return StellarSdk.Asset.native();
@@ -104,7 +97,7 @@ export default function DEXExplorer() {
     "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
   );
   const [book, setBook] = useState<OrderBookData | null>(null);
-  const [trades, setTrades] = useState<TradeRecord[]>([]);
+  const [trades, setTrades] = useState<StellarSdk.Horizon.ServerApi.TradeRecord[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -138,7 +131,7 @@ export default function DEXExplorer() {
         fetchTrades(sellingAsset, buyingAsset, network, 10),
       ]);
 
-      setBook(orderBook);
+      setBook(orderBook as OrderBookData);
       setTrades(tradeList);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load DEX data.");
@@ -264,7 +257,7 @@ export default function DEXExplorer() {
             No trades loaded yet.
           </div>
         )}
-        {trades.map((trade: TradeRecord) => (
+        {trades.map((trade) => (
           <div
             key={trade.id}
             style={{

@@ -26,7 +26,13 @@ export function useTransactionNotifications(): UseTransactionNotificationsResult
     transactionNotificationStore.getSnapshot(),
   )
 
-  useEffect(() => transactionNotificationStore.subscribe(setNotifications), [])
+  useEffect(
+    () =>
+      transactionNotificationStore.subscribe(() => {
+        setNotifications(transactionNotificationStore.getSnapshot());
+      }),
+    [],
+  );
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

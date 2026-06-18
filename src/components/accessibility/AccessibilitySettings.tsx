@@ -2,7 +2,7 @@ import React from 'react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import '../../styles/accessibility.css';
 
-export default function AccessibilitySettings({ onClose }: { onClose: () => void }) {
+export default function AccessibilitySettings({ onClose }: { onClose?: () => void }) {
   const { settings, setReducedMotion, setHighContrast, setFontSize } = useAccessibility();
 
   const toggleReduced = () => setReducedMotion(!settings.reducedMotion);
@@ -23,7 +23,7 @@ export default function AccessibilitySettings({ onClose }: { onClose: () => void
         padding: '16px',
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) onClose?.();
       }}
     >
       <div

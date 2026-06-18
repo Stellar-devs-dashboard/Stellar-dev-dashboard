@@ -401,7 +401,8 @@ export default function Network() {
                         boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
                       }}
                       formatter={(value, name) => {
-                        if (name === 'interval') return [`${value.toFixed(2)}s`, 'Tiempo de Cierre']
+                        const numeric = typeof value === 'number' ? value : Number(value)
+                        if (name === 'interval') return [`${numeric.toFixed(2)}s`, 'Tiempo de Cierre']
                         return [value, 'Operaciones']
                       }}
                       labelFormatter={(label) => `Ledger #${label.toLocaleString()}`}
@@ -411,7 +412,7 @@ export default function Network() {
                       y={averageCloseTime}
                       stroke="var(--cyan-dim)"
                       strokeDasharray="4 4"
-                      label={{ value: `Avg: ${averageCloseTime.toFixed(2)}s`, position: 'topRight', fontSize: 10, fill: 'var(--cyan)' }}
+                      label={{ value: `Avg: ${averageCloseTime.toFixed(2)}s`, position: 'insideTopRight', fontSize: 10, fill: 'var(--cyan)' }}
                     />
                     <Area
                       yAxisId="left"

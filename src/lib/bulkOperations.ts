@@ -5,13 +5,13 @@ import { SecretKeyHandle } from "./SecretKeyHandle";
 import type { NetworkName } from "./stellar";
 
 async function signWithSecretHandle(
-  transaction: StellarSdk.Transaction,
+  transaction: StellarSdk.Transaction | StellarSdk.FeeBumpTransaction,
   secretKey: string,
   network: NetworkName | string,
 ) {
   const handle = SecretKeyHandle.fromSecret(secretKey);
   try {
-    return await signAndSubmitTransaction(transaction, handle, network);
+    return await signAndSubmitTransaction(transaction, handle, network as NetworkName);
   } finally {
     handle.destroy();
   }
@@ -37,7 +37,7 @@ export interface BulkPaymentConfig {
     assetIssuer?: string;
   }>;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (status: BulkOperationStatus[]) => void;
 }
@@ -50,7 +50,7 @@ export interface BulkTrustlineConfig {
     limit?: string;
   }>;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (status: BulkOperationStatus[]) => void;
 }
@@ -58,7 +58,7 @@ export interface BulkTrustlineConfig {
 export interface RollbackConfig {
   sourceAccount: string;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (statuses: BulkOperationStatus[]) => void;
 }

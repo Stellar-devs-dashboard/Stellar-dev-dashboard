@@ -117,42 +117,45 @@ export default function Faucet() {
         </div>
       </div>
 
-      {faucetResult && (
+      {faucetResult && (() => {
+        const result = faucetResult as FaucetResult
+        return (
         <div className="animate-in" style={{
           background: 'var(--bg-card)',
-          border: `1px solid ${faucetResult.success ? 'var(--green)' : 'var(--red)'}`,
+          border: `1px solid ${result.success ? 'var(--green)' : 'var(--red)'}`,
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
-          boxShadow: faucetResult.success ? '0 0 24px var(--green-glow)' : '0 0 24px var(--red-glow)',
+          boxShadow: result.success ? '0 0 24px var(--green-glow)' : '0 0 24px var(--red-glow)',
         }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>{faucetResult.success ? '✓' : '✗'}</span>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', color: faucetResult.success ? 'var(--green)' : 'var(--red)' }}>
-              {faucetResult.success ? 'Account Funded!' : 'Funding Failed'}
+            <span>{result.success ? '✓' : '✗'}</span>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', color: result.success ? 'var(--green)' : 'var(--red)' }}>
+              {result.success ? 'Account Funded!' : 'Funding Failed'}
             </div>
           </div>
           <div style={{ padding: '16px 18px' }}>
-            {faucetResult.success ? (
+            {result.success ? (
               <>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Address funded:</div>
                 <CopyableValue
-                  value={faucetResult.address ?? ''}
+                  value={result.address ?? ''}
                   title="Copy funded public key"
                   containerStyle={{ fontSize: '13px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: '14px' }}
                   textStyle={{ display: 'inline-block' }}
                 >
-                  {faucetResult.address}
+                  {result.address}
                 </CopyableValue>
                 <div style={{ fontSize: '12px', color: 'var(--green)' }}>
                   ✓ 10,000 XLM added to account on testnet
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: '12px', color: 'var(--red)' }}>{faucetResult.error}</div>
+              <div style={{ fontSize: '12px', color: 'var(--red)' }}>{result.error}</div>
             )}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '18px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.7 }}>

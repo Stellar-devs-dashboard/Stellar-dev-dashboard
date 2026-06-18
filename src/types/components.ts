@@ -4,7 +4,9 @@
  * lets us evolve a single source of truth as the TS migration progresses.
  */
 
+import type { LucideIcon } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
+import type { AssetInfo, AssetSearchFilters, NetworkName } from '../lib/stellar'
 
 export interface CardProps {
   children?: ReactNode
@@ -45,4 +47,57 @@ export interface ResponsiveState {
   isTablet: boolean
   isDesktop: boolean
   breakpoints: ResponsiveBreakpoints
+}
+
+/** Lucide (or similar) icon used in dashboard cards */
+export type IconComponent = LucideIcon
+
+export interface AssetCardProps {
+  asset: AssetInfo
+  network: NetworkName
+  onClick?: () => void
+}
+
+export interface AssetFiltersState {
+  verified_only: boolean
+  min_accounts: number | null
+  max_accounts: number | null
+  has_domain: boolean
+  sort_by: string
+  order: string
+  asset_type: AssetSearchFilters['asset_type'] | ''
+  code_pattern: string
+  min_volume_24h: number | null
+  volatility: string
+  reputation_min: number
+  verification_level: string
+}
+
+export interface AssetFiltersProps {
+  filters: AssetFiltersState
+  onChange: (patch: Partial<AssetFiltersState>) => void
+}
+
+/** Risk signal shown on the analytics dashboard */
+export interface RiskSignal {
+  id: string
+  label: string
+  active: boolean
+  severity: 'high' | 'medium' | 'low' | 'critical' | 'warning' | 'info'
+}
+
+export interface AnalyticsAccountSummary {
+  xlmBalance?: number
+  trustlineCount?: number
+}
+
+export interface AnalyticsTransactionSummary {
+  successRate?: number
+  weeklyActivity?: number
+}
+
+export interface AnalyticsNetworkSummary {
+  latestLedgerSequence?: number | null
+  baseFee?: number
+  averageCloseSeconds?: number
 }

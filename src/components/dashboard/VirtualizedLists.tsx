@@ -171,28 +171,28 @@ export const VirtualOpList = ({ items, network, onLoadMore, hasMore, loading }: 
             {'from' in op && op.from && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 <CopyableValue
-                  value={(op as Record<string, string>).from}
+                  value={(op as unknown as Record<string, string>).from}
                   title="Copy source public key"
                   textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
                 >
-                  from: {shortAddress((op as Record<string, string>).from)}
+                  from: {shortAddress((op as unknown as Record<string, string>).from)}
                 </CopyableValue>
               </div>
             )}
             {'to' in op && op.to && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 <CopyableValue
-                  value={(op as Record<string, string>).to}
+                  value={(op as unknown as Record<string, string>).to}
                   title="Copy destination public key"
                   textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
                 >
-                  to: {shortAddress((op as Record<string, string>).to)}
+                  to: {shortAddress((op as unknown as Record<string, string>).to)}
                 </CopyableValue>
               </div>
             )}
             {'amount' in op && op.amount && (
               <div style={{ fontSize: '11px', color: 'var(--amber)' }}>
-                {parseFloat((op as Record<string, string>).amount).toFixed(4)} {'asset_code' in op ? (op as Record<string, string>).asset_code : 'XLM'}
+                {parseFloat((op as unknown as Record<string, string>).amount).toFixed(4)} {'asset_code' in op ? (op as unknown as Record<string, string>).asset_code : 'XLM'}
               </div>
             )}
           </div>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Mock the IndexedDB-backed storage layer so tests don't need a real IDB.
 // All persistence calls become no-ops; the in-memory L1 is exercised directly.
-vi.mock('../../../src/lib/storage.js', () => {
+vi.mock('../../../src/lib/storage', () => {
   const memory = new Map<string, { value: unknown; expiresAt: number; tag?: string }>()
   return {
     getStoredValue: vi.fn(async (key: string) => memory.get(key) ?? null),

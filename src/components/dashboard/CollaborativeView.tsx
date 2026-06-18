@@ -15,11 +15,25 @@
  *   <CollaborativeView store={store} />
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type CSSProperties } from 'react';
 import { useCollaboration } from '../../hooks/useCollaboration';
 
 // ── Inline style tokens — matches globals.css design tokens ──────────────────
-const S = {
+const S: {
+  root: CSSProperties
+  sectionTitle: CSSProperties
+  card: CSSProperties
+  row: CSSProperties
+  dot: (color: string) => CSSProperties
+  badge: (color: string) => CSSProperties
+  label: CSSProperties
+  value: CSSProperties
+  urlBox: CSSProperties
+  btn: (variant?: string) => CSSProperties
+  warning: CSSProperties
+  warningTitle: CSSProperties
+  divider: CSSProperties
+} = {
   root: {
     padding: '2rem',
     maxWidth: 680,
@@ -47,7 +61,7 @@ const S = {
     gap: '0.75rem',
     flexWrap: 'wrap',
   },
-  dot: (color) => ({
+  dot: (color: string): CSSProperties => ({
     width: 8,
     height: 8,
     borderRadius: '50%',
@@ -77,7 +91,7 @@ const S = {
     lineHeight: 1.6,
     fontFamily: "'Space Mono', monospace",
   },
-  btn: (variant = 'primary') => ({
+  btn: (variant = 'primary'): CSSProperties => ({
     padding: '0.5rem 1.1rem',
     borderRadius: 6,
     border: 'none',
@@ -108,7 +122,7 @@ const S = {
     marginBottom: '0.35rem',
     fontSize: '0.8rem',
   },
-  badge: (color) => ({
+  badge: (color: string): CSSProperties => ({
     display: 'inline-block',
     padding: '0.15rem 0.55rem',
     borderRadius: 20,

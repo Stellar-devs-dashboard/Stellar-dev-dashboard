@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react'
-import { useStore } from '../../lib/store'
-import type { StreamLedger } from '../../lib/store'
+import { useStore, type StreamLedger } from '../../lib/store'
 import { connectLedgerStream } from '../../lib/streaming'
 import { format } from 'date-fns'
 
@@ -40,7 +39,7 @@ export default function RealTimeLedger() {
 
     const cleanup = connectLedgerStream(
       network,
-      (ledger: Record<string, unknown>) => {
+      (ledger: StreamLedger) => {
         addStreamLedger(ledger)
         setStreamError(null)
       },

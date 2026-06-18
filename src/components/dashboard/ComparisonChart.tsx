@@ -160,7 +160,7 @@ export default function ComparisonChart({ comparisonSlots }: ComparisonChartProp
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
                 <PolarGrid stroke="var(--border)" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: 'var(--text-secondary)', fontSize: 11 } as React.CSSProperties} />
+                <PolarAngleAxis dataKey="metric" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                 <RechartsTooltip content={<CustomRadarTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px' } as React.CSSProperties}

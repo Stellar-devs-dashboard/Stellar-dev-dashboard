@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ContractDeployer } from '../ContractDeployer';
+import { ContractDeployer, type ConstructorArgInput } from '../ContractDeployer';
 
 vi.mock('../CostEstimator', () => ({
   CostEstimator: {
     estimate: vi.fn().mockResolvedValue({
       estimatedFeeStroops: 50000,
       footprintKb: 45,
-      argCount: 2
+      argCount: 2,
+      baseStorageFee: 100000,
+      perKbFee: 90000,
+      perArgFee: 3000,
+      totalWithMargin: 50000,
     })
   }
 }));
@@ -14,7 +18,10 @@ vi.mock('../CostEstimator', () => ({
 describe('ContractDeployer', () => {
   let deployer: ContractDeployer;
   const mockWasm = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
-  const mockArgs = ['arg1', 123];
+  const mockArgs: ConstructorArgInput[] = [
+    { type: 'string', value: 'arg1' },
+    { type: 'int', value: '123' },
+  ];
   const mockSourceAccount = 'GB3HXR3XUBYQ6U52KOWF6Q2J7F7B4R4XQ4V4N4F4H7VUXG54R6L3B2XF';
 
   beforeEach(() => {

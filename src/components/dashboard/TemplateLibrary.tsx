@@ -241,7 +241,7 @@ export const TemplateLibrary: React.FC = () => {
 };
 
 const StatCard: React.FC<{
-  icon: React.ComponentType<{ size: number; style?: React.CSSProperties }>;
+  icon: import('../../types/components').IconComponent;
   label: string;
   value: string;
 }> = ({ icon: Icon, label, value }) => (
