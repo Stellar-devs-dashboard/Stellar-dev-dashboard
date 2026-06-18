@@ -68,6 +68,36 @@ export default [
       'no-case-declarations': 'warn',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
+      // Prevent secret seeds from reaching logging / metrics sinks (#secret-key-handle)
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression[callee.name=/^(log|info|warn|error|debug|trace)$/] > Identifier[name=/^(secret|secretKey|secret_key|privateKey|private_key)/i]',
+          message:
+            'Do not pass secret-key identifiers to logging functions. Use SecretKeyHandle instead.',
+        },
+        {
+          selector:
+            'CallExpression[callee.name="recordCustomMetric"] > Identifier[name=/^(secret|secretKey|secret_key|privateKey|private_key)/i]',
+          message: 'Do not pass secret-key identifiers to recordCustomMetric metadata.',
+        },
+        {
+          selector:
+            'CallExpression[callee.name="measureAsync"] > Identifier[name=/^(secret|secretKey|secret_key|privateKey|private_key)/i]',
+          message: 'Do not pass secret-key identifiers to measureAsync metadata.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(logAPICall|logError|logEvent|logSecurityEvent|logUserAction|logDataChange)$/][callee.object.name="auditTrail"] > Identifier[name=/^(secret|secretKey|secret_key|privateKey|private_key)/i]',
+          message: 'Do not pass secret-key identifiers to auditTrail logging methods.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(captureException|captureMessage|addBreadcrumb)$/] > Identifier[name=/^(secret|secretKey|secret_key|privateKey|private_key)/i]',
+          message: 'Do not pass secret-key identifiers to errorReporting functions.',
+        },
+      ],
     },
   },
 ];

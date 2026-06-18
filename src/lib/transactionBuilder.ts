@@ -1,6 +1,9 @@
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { getServer, NETWORKS, isValidPublicKey, type NetworkName } from "./stellar";
 import { measureAsync, recordCustomMetric } from "./performanceMonitoring";
+import { SecretKeyHandle } from "./SecretKeyHandle";
+
+export { SecretKeyHandle };
 
 export const OPERATION_TYPES = [
   { value: "payment", label: "Payment" },
@@ -459,14 +462,14 @@ export function feeBump({
 
 export async function signAndSubmitTransaction(
   transaction: StellarSdk.Transaction | StellarSdk.FeeBumpTransaction,
-  secretKey: string,
+  secretHandle: SecretKeyHandle,
   network: NetworkName = "testnet",
 ) {
-  if (!StellarSdk.StrKey.isValidEd25519SecretSeed(secretKey)) {
-    throw new Error("Invalid secret key");
+  if (!(secretHandle instanceof SecretKeyHandle)) {
+    throw new TypeError("secretHandle must be a SecretKeyHandle instance");
   }
 
-  const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+  const keypair = secretHandle.getKeypair();
   const signingStart = performance.now();
   transaction.sign(keypair);
   recordCustomMetric("TRANSACTION_SIGNING_DURATION", performance.now() - signingStart, {
