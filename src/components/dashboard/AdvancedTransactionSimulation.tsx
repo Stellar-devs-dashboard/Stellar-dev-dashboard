@@ -2,7 +2,13 @@ import React, { useMemo, useState, type ReactNode } from 'react'
 import {
   runAdvancedTransactionSimulation,
 } from '../../lib/stellar'
-import type { AdvancedSimulationReport } from '../../lib/stellar'
+import type {
+  AdvancedSimulationParams,
+  AdvancedSimulationReport,
+  BuilderOperation,
+  NetworkName,
+  TimeBounds,
+} from '../../lib/stellar'
 import { useStore } from '../../lib/store'
 import { getErrorMessage } from '../../lib/errorHandling/ErrorMessages'
 
@@ -65,15 +71,23 @@ export default function AdvancedTransactionSimulation({ transactionParams: propP
     { label: 'Complex Payload', networkCongestion: 0.7, operationMultiplier: 1.4, baseFee: (transactionParams?.baseFee || 100) + 50 },
   ]), [transactionParams?.baseFee])
 
+  function buildSimulationParams(): AdvancedSimulationParams {
+    return {
+      sourceAccount: transactionParams.sourceAccount || '',
+      operations: (transactionParams.operations ?? []) as BuilderOperation[],
+      baseFee: transactionParams.baseFee ?? 100,
+      timeBounds: (transactionParams.timeBounds ?? {}) as TimeBounds,
+      network: (transactionParams.network ?? network) as NetworkName,
+      currentLedgerLoad: parseFloat(congestion) || 0.55,
+      scenarios,
+    }
+  }
+
   async function handleRunSimulation() {
     setIsLoading(true)
     setError('')
     try {
-      const output = await runAdvancedTransactionSimulation({
-        ...transactionParams,
-        currentLedgerLoad: parseFloat(congestion) || 0.55,
-        scenarios,
-      } as Parameters<typeof runAdvancedTransactionSimulation>[0])
+      const output = await runAdvancedTransactionSimulation(buildSimulationParams())
       setResult(output)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Simulation failed')

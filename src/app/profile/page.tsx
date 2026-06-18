@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { WalletContext } from '@/context/WalletContext'; // Adjust if your context path is different
+import React, { useState } from 'react';
+import { useStore } from '../../lib/store';
 
 export default function ProfilePage() {
-  const { wallet, connected, disconnect } = React.useContext(WalletContext);
+  const { walletPublicKey, walletConnected, disconnectWallet } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
     username: "Stellar Builder",
@@ -20,7 +20,7 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
-  if (!connected) {
+  if (!walletConnected) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -36,7 +36,7 @@ export default function ProfilePage() {
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-4xl font-bold">My Profile</h1>
         <button
-          onClick={disconnect}
+          onClick={disconnectWallet}
           className="text-red-400 hover:text-red-500 transition"
         >
           Disconnect Wallet
@@ -63,7 +63,7 @@ export default function ProfilePage() {
             )}
 
             <p className="text-gray-400 font-mono">
-              {wallet?.publicKey?.slice(0, 8)}...{wallet?.publicKey?.slice(-6)}
+              {walletPublicKey?.slice(0, 8)}...{walletPublicKey?.slice(-6)}
             </p>
 
             {isEditing ? (

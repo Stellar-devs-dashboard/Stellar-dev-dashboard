@@ -46,7 +46,7 @@ export default {
 
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
-    '!src/main.jsx',
+    '!src/main.tsx',
     '!src/i18n/**',
     '!src/styles/**',
     '!src/**/*.test.{js,jsx,ts,tsx}',

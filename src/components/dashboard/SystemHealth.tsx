@@ -3,9 +3,11 @@ import { useStore } from '../../lib/store'
 import { useMonitoring } from "../../hooks/useMonitoring";
 import { StatCard } from "./Card";
 import { LatencyTrendChart } from "../charts/AnalyticsChart";
-import type { AlertEntry, MonitoringSnapshot, HealthProbe, NetworkHealthProbe } from "./types";
+import type { AlertItem } from "../../lib/alerts";
+import type { HealthSnapshot, LatencyPoint, RuntimeErrorRecord } from "../../utils/monitoring";
+import type { NetworkProbeResult, ServiceProbeResult } from "../../lib/stellar";
 
-function AlertRow({ alert, onClear }: { alert: AlertEntry; onClear: (id: string) => void }) {
+function AlertRow({ alert, onClear }: { alert: AlertItem; onClear: (id: string) => void }) {
   const color =
     alert.severity === "critical"
       ? "var(--red)"
@@ -48,7 +50,7 @@ function AlertRow({ alert, onClear }: { alert: AlertEntry; onClear: (id: string)
   );
 }
 
-function ServiceStatus({ label, probe }: { label: string; probe: HealthProbe }) {
+function ServiceStatus({ label, probe }: { label: string; probe: ServiceProbeResult }) {
   const color =
     probe.status === "up"
       ? "var(--green)"
@@ -86,23 +88,16 @@ function ServiceStatus({ label, probe }: { label: string; probe: HealthProbe }) 
 
 export default function SystemHealth() {
   const { setActiveTab } = useStore()
-  const { snapshot, score, alerts, errors, clearAlert, resetAlerts } = useMonitoring() as {
-    snapshot: MonitoringSnapshot
-    score: number
-    alerts: AlertEntry[]
-    errors: Array<Record<string, unknown>>
-    clearAlert: (id: string) => void
-    resetAlerts: () => void
-  }
+  const { snapshot, score, alerts, errors, clearAlert, resetAlerts } = useMonitoring()
   const memory = snapshot?.memory;
-  const networkHealth: NetworkHealthProbe[] = snapshot?.networkHealth || [];
-  const latencyHistory: Array<{ timestamp: number; latency: number }> = snapshot?.latencyHistory || [];
+  const networkHealth = snapshot?.networkHealth || [];
+  const latencyHistory: LatencyPoint[] = snapshot?.latencyHistory || [];
 
   const averageLatency = latencyHistory.length
     ? Math.round(latencyHistory[latencyHistory.length - 1].latency)
     : null;
 
-  const openBreakers = networkHealth.reduce((count: number, network: NetworkHealthProbe) => {
+  const openBreakers = networkHealth.reduce((count: number, network: NetworkProbeResult) => {
     return (
       count +
       (network.horizon.breakerState === "OPEN" ? 1 : 0) +
@@ -157,7 +152,7 @@ export default function SystemHealth() {
         <div style={{ display: "grid", gap: "12px" }}>
           <div style={{ fontFamily: "var(--font-display)", fontSize: "13px" }}>Network Probes</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "12px" }}>
-            {networkHealth.map((netProbe: NetworkHealthProbe) => (
+            {networkHealth.map((netProbe: NetworkProbeResult) => (
               <div
                 key={netProbe.network}
                 style={{
@@ -227,7 +222,7 @@ export default function SystemHealth() {
             No active alerts.
           </div>
         )}
-        {alerts.map((alert: AlertEntry) => (
+        {alerts.map((alert: AlertItem) => (
           <AlertRow key={alert.id} alert={alert} onClear={clearAlert} />
         ))}
       </div>

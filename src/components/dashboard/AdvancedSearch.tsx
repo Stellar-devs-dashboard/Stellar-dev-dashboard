@@ -22,23 +22,43 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
-import advancedSearchService from '../../lib/advancedSearch.js';
-import auditTrail from '../../lib/auditTrail.js';
+import advancedSearchService, {
+  type DataType,
+  type SavedSearch,
+  type SearchableItem,
+  type SearchFilters,
+  type SearchHistoryEntry,
+  type SearchQuery,
+  type SearchResult,
+  type SortOptions,
+} from '../../lib/advancedSearch';
+import auditTrail from '../../lib/auditTrail';
 import { format } from 'date-fns';
+
+interface UiFilters {
+  dateRange: { start: string; end: string };
+  assetType: string;
+  operationType: string;
+  amountRange: { min: string; max: string };
+  addressFilter: string;
+  memoFilter: string;
+  statusFilter: string;
+  networkFilter: string;
+}
 
 export default function AdvancedSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [savedSearches, setSavedSearches] = useState([]);
-  const [searchHistory, setSearchHistory] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedTypes, setSelectedTypes] = useState(['transactions', 'operations', 'contracts', 'accounts']);
+  const [selectedTypes, setSelectedTypes] = useState<DataType[]>(['transactions', 'operations', 'contracts', 'accounts']);
   
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<UiFilters>({
     dateRange: { start: '', end: '' },
     assetType: '',
     operationType: '',
@@ -49,7 +69,7 @@ export default function AdvancedSearch() {
     networkFilter: '',
   });
 
-  const [sort, setSort] = useState({
+  const [sort, setSort] = useState<SortOptions>({
     field: 'timestamp',
     direction: 'desc'
   });
@@ -76,7 +96,7 @@ export default function AdvancedSearch() {
 
   const loadData = () => {
     setSavedSearches(advancedSearchService.getSavedSearches());
-    setSearchHistory(advancedSearchService.searchHistory);
+    setSearchHistory(advancedSearchService.getSearchHistory());
   };
 
   const handleSearch = async () => {
@@ -86,7 +106,7 @@ export default function AdvancedSearch() {
 
     setLoading(true);
     try {
-      const query = {
+      const query: SearchQuery = {
         text: searchQuery.trim(),
         types: selectedTypes,
         filters: buildFilters(),
@@ -113,31 +133,62 @@ export default function AdvancedSearch() {
     }
   };
 
-  const buildFilters = () => {
-    const builtFilters = {};
-    
-    if (filters.dateRange.start) {
-      builtFilters.dateRange = { ...builtFilters.dateRange, start: new Date(filters.dateRange.start).getTime() };
+  const buildFilters = (): Partial<SearchFilters> => {
+    const builtFilters: Partial<SearchFilters> = {};
+
+    if (filters.dateRange.start || filters.dateRange.end) {
+      builtFilters.dateRange = {
+        start: filters.dateRange.start ? new Date(filters.dateRange.start).getTime() : null,
+        end: filters.dateRange.end ? new Date(filters.dateRange.end).getTime() : null,
+      };
     }
-    if (filters.dateRange.end) {
-      builtFilters.dateRange = { ...builtFilters.dateRange, end: new Date(filters.dateRange.end).getTime() };
-    }
-    
+
     if (filters.assetType) builtFilters.assetType = filters.assetType;
     if (filters.operationType) builtFilters.operationType = filters.operationType;
     if (filters.addressFilter) builtFilters.addressFilter = filters.addressFilter;
     if (filters.memoFilter) builtFilters.memoFilter = filters.memoFilter;
     if (filters.statusFilter) builtFilters.statusFilter = filters.statusFilter;
     if (filters.networkFilter) builtFilters.networkFilter = filters.networkFilter;
-    
-    if (filters.amountRange.min) {
-      builtFilters.amountRange = { ...builtFilters.amountRange, min: parseFloat(filters.amountRange.min) };
+
+    if (filters.amountRange.min || filters.amountRange.max) {
+      builtFilters.amountRange = {
+        min: filters.amountRange.min ? parseFloat(filters.amountRange.min) : null,
+        max: filters.amountRange.max ? parseFloat(filters.amountRange.max) : null,
+      };
     }
-    if (filters.amountRange.max) {
-      builtFilters.amountRange = { ...builtFilters.amountRange, max: parseFloat(filters.amountRange.max) };
-    }
-    
+
     return builtFilters;
+  };
+
+  const searchFiltersToUiFilters = (serviceFilters: Partial<SearchFilters>): Partial<UiFilters> => {
+    const ui: Partial<UiFilters> = {};
+
+    if (serviceFilters.dateRange) {
+      ui.dateRange = {
+        start: serviceFilters.dateRange.start != null
+          ? format(new Date(serviceFilters.dateRange.start), 'yyyy-MM-dd')
+          : '',
+        end: serviceFilters.dateRange.end != null
+          ? format(new Date(serviceFilters.dateRange.end), 'yyyy-MM-dd')
+          : '',
+      };
+    }
+
+    if (serviceFilters.assetType) ui.assetType = serviceFilters.assetType;
+    if (serviceFilters.operationType) ui.operationType = serviceFilters.operationType;
+    if (serviceFilters.addressFilter) ui.addressFilter = serviceFilters.addressFilter;
+    if (serviceFilters.memoFilter) ui.memoFilter = serviceFilters.memoFilter;
+    if (serviceFilters.statusFilter) ui.statusFilter = serviceFilters.statusFilter;
+    if (serviceFilters.networkFilter) ui.networkFilter = serviceFilters.networkFilter;
+
+    if (serviceFilters.amountRange) {
+      ui.amountRange = {
+        min: serviceFilters.amountRange.min != null ? String(serviceFilters.amountRange.min) : '',
+        max: serviceFilters.amountRange.max != null ? String(serviceFilters.amountRange.max) : '',
+      };
+    }
+
+    return ui;
   };
 
   const hasActiveFilters = () => {
@@ -166,7 +217,7 @@ export default function AdvancedSearch() {
   const saveSearch = () => {
     const name = prompt('Enter a name for this search:');
     if (name) {
-      const query = {
+      const query: SearchQuery = {
         text: searchQuery.trim(),
         types: selectedTypes,
         filters: buildFilters(),
@@ -179,20 +230,29 @@ export default function AdvancedSearch() {
     }
   };
 
-  const loadSavedSearch = (savedSearch) => {
+  const loadSavedSearch = (savedSearch: SavedSearch) => {
     setSearchQuery(savedSearch.query.text || '');
     setSelectedTypes(savedSearch.query.types || ['transactions', 'operations']);
-    
-    // Reset filters and load saved ones
-    clearFilters();
-    if (savedSearch.query.filters) {
-      setFilters({ ...filters, ...savedSearch.query.filters });
+
+    setFilters({
+      dateRange: { start: '', end: '' },
+      assetType: '',
+      operationType: '',
+      amountRange: { min: '', max: '' },
+      addressFilter: '',
+      memoFilter: '',
+      statusFilter: '',
+      networkFilter: '',
+      ...searchFiltersToUiFilters(savedSearch.query.filters ?? {}),
+    });
+
+    if (savedSearch.query.sort?.field && savedSearch.query.sort?.direction) {
+      setSort({
+        field: savedSearch.query.sort.field,
+        direction: savedSearch.query.sort.direction,
+      });
     }
-    
-    if (savedSearch.query.sort) {
-      setSort(savedSearch.query.sort);
-    }
-    
+
     setShowHistory(false);
     handleSearch();
   };
@@ -212,18 +272,22 @@ export default function AdvancedSearch() {
     auditTrail.logUserAction('Exported search results', { resultCount: searchResults.total });
   };
 
-  const handleSuggestionClick = (suggestion) => {
+  const handleSuggestionClick = (suggestion: string) => {
     setSearchQuery(suggestion);
     setShowSuggestions(false);
   };
 
-  const handleTypeToggle = (type) => {
+  const handleTypeToggle = (type: DataType) => {
     setSelectedTypes(prev => 
       prev.includes(type) 
         ? prev.filter(t => t !== type)
         : [...prev, type]
     );
   };
+
+  const resultTotalPages = searchResults
+    ? Math.max(1, Math.ceil(searchResults.total / searchResults.limit))
+    : 1;
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -270,20 +334,23 @@ export default function AdvancedSearch() {
           <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '4px' }}>
             <button
               onClick={() => setShowHistory(!showHistory)}
-              style={{ ...iconButtonStyle, title: 'Search History' }}
+              title="Search History"
+              style={iconButtonStyle}
             >
               <History size={14} />
             </button>
             <button
               onClick={saveSearch}
-              style={{ ...iconButtonStyle, title: 'Save Search' }}
+              title="Save Search"
+              style={iconButtonStyle}
             >
               <Save size={14} />
             </button>
             <button
               onClick={handleSearch}
               disabled={loading}
-              style={{ ...iconButtonStyle, background: 'var(--cyan)', color: 'white', title: 'Search' }}
+              title="Search"
+              style={{ ...iconButtonStyle, background: 'var(--cyan)', color: 'white' }}
             >
               {loading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
             </button>
@@ -315,8 +382,8 @@ export default function AdvancedSearch() {
                     color: 'var(--text-primary)',
                     borderBottom: '1px solid var(--border)',
                   }}
-                  onMouseEnter={(e) => e.target.style.background = 'var(--bg-card)'}
-                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-card)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   {suggestion}
                 </div>
@@ -329,7 +396,7 @@ export default function AdvancedSearch() {
         <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Search in:</div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {['transactions', 'operations', 'contracts', 'accounts'].map(type => (
+            {(['transactions', 'operations', 'contracts', 'accounts'] as DataType[]).map(type => (
               <button
                 key={type}
                 onClick={() => handleTypeToggle(type)}
@@ -710,7 +777,7 @@ export default function AdvancedSearch() {
               </div>
 
               {/* Pagination */}
-              {searchResults.totalPages > 1 && (
+              {resultTotalPages > 1 && (
                 <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                   <button
                     onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
@@ -721,12 +788,12 @@ export default function AdvancedSearch() {
                   </button>
                   
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Page {searchResults.page} of {searchResults.totalPages}
+                    Page {searchResults.page} of {resultTotalPages}
                   </span>
                   
                   <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: Math.min(searchResults.totalPages, prev.page + 1) }))}
-                    disabled={searchResults.page === searchResults.totalPages}
+                    onClick={() => setPagination(prev => ({ ...prev, page: Math.min(resultTotalPages, prev.page + 1) }))}
+                    disabled={searchResults.page === resultTotalPages}
                     style={paginationButtonStyle}
                   >
                     Next
@@ -741,27 +808,27 @@ export default function AdvancedSearch() {
   );
 }
 
-function SearchResultItem({ result }) {
+function SearchResultItem({ result }: { result: SearchableItem }) {
   const [expanded, setExpanded] = useState(false);
 
-  const getTypeIcon = (type) => {
-    const icons = {
+  const getTypeIcon = (type: DataType) => {
+    const icons: Record<DataType, React.ReactNode> = {
       transactions: <Hash size={14} />,
       operations: <Activity size={14} />,
       contracts: <FileText size={14} />,
-      accounts: <Globe size={14} />
+      accounts: <Globe size={14} />,
     };
-    return icons[type] || <Search size={14} />;
+    return icons[type] ?? <Search size={14} />;
   };
 
-  const getTypeColor = (type) => {
-    const colors = {
+  const getTypeColor = (type: DataType) => {
+    const colors: Record<DataType, string> = {
       transactions: 'var(--blue)',
       operations: 'var(--green)',
       contracts: 'var(--purple)',
-      accounts: 'var(--orange)'
+      accounts: 'var(--orange)',
     };
-    return colors[type] || 'var(--text-secondary)';
+    return colors[type] ?? 'var(--text-secondary)';
   };
 
   return (
@@ -789,7 +856,7 @@ function SearchResultItem({ result }) {
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 {result.address && <span>Address: {result.address.substring(0, 16)}... </span>}
                 {result.asset && <span>Asset: {result.asset} </span>}
-                {result.amount && <span>Amount: {result.amount} </span>}
+                {result.amount != null && <span>Amount: {result.amount} </span>}
                 {result.status && <span>Status: {result.status}</span>}
               </div>
               
@@ -824,7 +891,7 @@ function SearchResultItem({ result }) {
   );
 }
 
-function AggregationChip({ label, data }) {
+function AggregationChip({ label, data }: { label: string; data: Record<string, number> }) {
   const entries = Object.entries(data).slice(0, 3);
   
   return (
@@ -838,7 +905,7 @@ function AggregationChip({ label, data }) {
       <span style={{ color: 'var(--text-muted)' }}>{label}:</span>
       {entries.map(([key, value], index) => (
         <span key={key} style={{ marginLeft: '4px' }}>
-          {key} ({value})
+          {key} ({String(value)})
           {index < entries.length - 1 && ', '}
         </span>
       ))}
@@ -847,7 +914,7 @@ function AggregationChip({ label, data }) {
   );
 }
 
-const inputStyle = {
+const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 12px',
   background: 'var(--bg-elevated)',
@@ -859,7 +926,7 @@ const inputStyle = {
   outline: 'none',
 };
 
-const labelStyle = {
+const labelStyle: React.CSSProperties = {
   fontSize: '12px',
   color: 'var(--text-muted)',
   textTransform: 'uppercase',
@@ -869,7 +936,7 @@ const labelStyle = {
   marginBottom: '6px',
 };
 
-const chipStyle = {
+const chipStyle: React.CSSProperties = {
   padding: '4px 12px',
   background: 'var(--bg-elevated)',
   border: '1px solid var(--border)',
@@ -879,7 +946,7 @@ const chipStyle = {
   transition: 'var(--transition)',
 };
 
-const iconButtonStyle = {
+const iconButtonStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -893,7 +960,7 @@ const iconButtonStyle = {
   transition: 'var(--transition)',
 };
 
-const paginationButtonStyle = {
+const paginationButtonStyle: React.CSSProperties = {
   padding: '6px 12px',
   background: 'var(--bg-elevated)',
   border: '1px solid var(--border)',

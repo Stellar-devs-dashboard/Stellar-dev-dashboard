@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Download, Filter, Search, X } from 'lucide-react'
 import { format } from 'date-fns'
+import type { Horizon } from '@stellar/stellar-sdk'
 import { useStore } from '../../lib/store'
 import { shortAddress, getOperationLabel, fetchTransactions, fetchOperations } from '../../lib/stellar'
 import CopyableValue from './CopyableValue'
@@ -14,7 +15,26 @@ import { VirtualTxList, VirtualOpList, TX_ROW_HEIGHT, OP_ROW_HEIGHT } from './Vi
 const VIRTUAL_SCROLL_THRESHOLD = 200
 const PAGE_SIZE = 100
 
-function normalizeSearch(value) {
+function LoadingRows({ count, height }: { count: number; height: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => (
+        <div
+          key={index}
+          style={{
+            height,
+            margin: '8px 18px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--bg-elevated)',
+            opacity: 0.6,
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
+function normalizeSearch(value: unknown) {
   return String(value || '').toLowerCase().trim()
 }
 
@@ -22,38 +42,50 @@ function searchableText(values) {
   return values.filter(Boolean).join(' ').toLowerCase()
 }
 
-function getOperationAccounts(op) {
+function getOperationAccounts(op: Horizon.ServerApi.OperationRecord) {
+  const extended = op as Horizon.ServerApi.OperationRecord & Record<string, string | undefined>
   return [
-    op.from,
-    op.to,
+    extended.from,
+    extended.to,
     op.source_account,
-    op.account,
-    op.funder,
-    op.into,
-    op.trustor,
-    op.trustee,
-    op.seller,
-    op.buyer,
-    op.selling_asset_issuer,
-    op.buying_asset_issuer,
-    op.asset_issuer,
+    extended.account,
+    extended.funder,
+    extended.into,
+    extended.trustor,
+    extended.trustee,
+    extended.seller,
+    extended.buyer,
+    extended.selling_asset_issuer,
+    extended.buying_asset_issuer,
+    extended.asset_issuer,
   ].filter(Boolean)
 }
 
-function flattenOperation(op) {
+function getOperationAmount(op: Horizon.ServerApi.OperationRecord): string {
+  if ('amount' in op && typeof op.amount === 'string') return op.amount
+  return ''
+}
+
+function getOperationAssetCode(op: Horizon.ServerApi.OperationRecord): string {
+  if ('asset_code' in op && typeof op.asset_code === 'string') return op.asset_code
+  return 'XLM'
+}
+
+function flattenOperation(op: Horizon.ServerApi.OperationRecord) {
+  const extended = op as Horizon.ServerApi.OperationRecord & Record<string, string | undefined>
   return {
     id: op.id,
     transaction_hash: op.transaction_hash || '',
     type: op.type,
     type_label: getOperationLabel(op.type),
     created_at: op.created_at,
-    from: op.from || '',
-    to: op.to || '',
+    from: extended.from || '',
+    to: extended.to || '',
     source_account: op.source_account || '',
-    account: op.account || '',
-    amount: op.amount || '',
-    asset_code: op.asset_code || 'XLM',
-    asset_issuer: op.asset_issuer || '',
+    account: extended.account || '',
+    amount: getOperationAmount(op),
+    asset_code: getOperationAssetCode(op),
+    asset_issuer: extended.asset_issuer || '',
   }
 }
 
@@ -139,8 +171,8 @@ export default function Transactions() {
           op.transaction_hash,
           op.type,
           getOperationLabel(op.type),
-          op.amount,
-          op.asset_code,
+          getOperationAmount(op),
+          getOperationAssetCode(op),
           ...accounts,
           ...labels,
         ]).includes(q)
@@ -195,7 +227,7 @@ export default function Transactions() {
   function handleExportCsv() {
     if (view === 'transactions') {
       exportCsv(
-        filteredTransactions.map(flattenTransaction),
+        filteredTransactions.map((tx) => flattenTransaction(tx as unknown as Record<string, unknown>)),
         `stellar-${network}-filtered-transactions`,
         ['id', 'hash', 'ledger', 'created_at', 'source_account', 'fee_charged', 'operation_count', 'successful', 'memo_type', 'memo']
       )
@@ -493,15 +525,26 @@ export default function Transactions() {
           ) : useVirtualOp ? (
             <VirtualOpList
               items={filteredOperations}
+              network={network}
               onLoadMore={handleLoadMoreOperations}
               hasMore={opsHasMore}
               loading={opsPagingLoading}
             />
           ) : (
             <>
-              {filteredOperations.map((op, index) => (
+              {filteredOperations.map((op, index) => {
+                const extended = op as Horizon.ServerApi.OperationRecord & {
+                  from?: string
+                  to?: string
+                  amount?: string
+                  asset_code?: string
+                }
+                const amount = getOperationAmount(op)
+                const assetCode = getOperationAssetCode(op)
+
+                return (
                 <div
-                  key={op.id}
+                  key={String(op.id)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr auto',
@@ -529,25 +572,25 @@ export default function Transactions() {
                         {getOperationLabel(op.type)}
                       </span>
                     </div>
-                    {op.from && (
+                    {extended.from && (
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        from: {addressLabels[op.from] ? `${addressLabels[op.from]} ` : ''}
-                        <CopyableValue value={op.from} title="Copy source public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          {shortAddress(op.from)}
+                        from: {addressLabels[extended.from] ? `${addressLabels[extended.from]} ` : ''}
+                        <CopyableValue value={extended.from} title="Copy source public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {shortAddress(extended.from)}
                         </CopyableValue>
                       </div>
                     )}
-                    {op.to && (
+                    {extended.to && (
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        to: {addressLabels[op.to] ? `${addressLabels[op.to]} ` : ''}
-                        <CopyableValue value={op.to} title="Copy destination public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          {shortAddress(op.to)}
+                        to: {addressLabels[extended.to] ? `${addressLabels[extended.to]} ` : ''}
+                        <CopyableValue value={extended.to} title="Copy destination public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {shortAddress(extended.to)}
                         </CopyableValue>
                       </div>
                     )}
-                    {op.amount && (
+                    {amount && (
                       <div style={{ fontSize: '11px', color: 'var(--amber)' }}>
-                        {parseFloat(op.amount).toFixed(4)} {op.asset_code || 'XLM'}
+                        {parseFloat(amount).toFixed(4)} {assetCode}
                       </div>
                     )}
                   </div>
@@ -555,7 +598,7 @@ export default function Transactions() {
                     {format(new Date(op.created_at), 'MMM d, HH:mm')}
                   </div>
                 </div>
-              ))}
+              )})}
               <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
                 {opsHasMore || opsPagingLoading ? (
                   <button

@@ -24,7 +24,7 @@ export default function AssetsWidget({ onRefresh, maxAssets = 5 }: AssetsWidgetP
     balances: accountData?.balances || [],
     connectedAddress,
     network,
-    refreshKey: accountData,
+    refreshKey: accountData?.account_id ?? connectedAddress ?? '',
   });
 
   const otherAssets: AssetBalance[] = accountData?.balances?.filter((b: AssetBalance) => b.asset_type !== 'native') || [];

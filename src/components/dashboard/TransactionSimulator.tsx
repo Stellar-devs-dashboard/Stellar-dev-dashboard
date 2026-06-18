@@ -1,6 +1,6 @@
 import React, { useState, type ReactNode } from "react";
 import { simulateTransaction } from "../../lib/stellar";
-import type { SimulateResult } from "../../lib/stellar";
+import type { SimulateResult, BuildTransactionParams, BuilderOperation, NetworkName, TimeBounds } from "../../lib/stellar";
 import { useStore } from "../../lib/store";
 import { getErrorMessage } from "../../lib/errorHandling/ErrorMessages";
 
@@ -120,6 +120,16 @@ export default function TransactionSimulator({
     network
   };
 
+  function buildParams(): BuildTransactionParams {
+    return {
+      sourceAccount: transactionParams.sourceAccount || "",
+      operations: (transactionParams.operations ?? []) as BuilderOperation[],
+      baseFee: transactionParams.baseFee ?? 100,
+      timeBounds: (transactionParams.timeBounds ?? {}) as TimeBounds,
+      network: (transactionParams.network ?? network) as NetworkName,
+    };
+  }
+
   async function handleSimulate() {
     if (!transactionParams.sourceAccount) {
       const err = getErrorMessage('validation');
@@ -129,7 +139,7 @@ export default function TransactionSimulator({
 
     setLoading(true);
     try {
-      const simResult = await simulateTransaction(transactionParams);
+      const simResult = await simulateTransaction(buildParams());
       setResult(simResult);
       if (onSimulate) onSimulate(simResult);
     } catch (error: unknown) {
@@ -295,7 +305,7 @@ export default function TransactionSimulator({
                       fontFamily: "var(--font-mono)",
                     }}
                   >
-                    {result.hash?.slice(0, 16)}...
+                    {result.xdr?.slice(0, 16)}...
                   </div>
                 </div>
               </div>

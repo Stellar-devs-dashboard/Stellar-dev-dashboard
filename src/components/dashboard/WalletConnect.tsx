@@ -18,6 +18,7 @@ import {
   detectPhishingRisk,
   readSecurityAuditLog,
   getSessionSecurityPosture,
+  type SecurityAuditEntry,
 } from '../../lib/wallet/security'
 import Card from './Card'
 
@@ -27,14 +28,6 @@ interface WalletDef {
   icon: string
   description: string
   type: string
-}
-
-interface AuditEntry {
-  id: string
-  action: string
-  status: string
-  details: string
-  timestamp: number
 }
 
 interface SecurityPosture {
@@ -52,10 +45,14 @@ interface ConnectOptions {
   mode?: string
 }
 
+type HardwareWalletType = 'ledger' | 'trezor' | 'keystone'
+
 interface SocialRecoveryConfig {
   threshold: number
-  guardians: string[]
-  [key: string]: unknown
+  guardianCount: number
+  recoveryMode: string
+  signers: { publicKey: string; weight: number; type: string }[]
+  thresholds: { low: number; med: number; high: number }
 }
 
 const SOFTWARE_WALLETS: WalletDef[] = [
@@ -199,7 +196,7 @@ function SocialRecoveryPanel() {
         .map((k) => k.trim())
         .filter(Boolean)
       const config = buildSocialRecoveryConfig(keys, Number(threshold))
-      setResult(config as SocialRecoveryConfig)
+      setResult(config)
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e))
     }
@@ -316,11 +313,11 @@ export default function WalletConnect() {
   const [connecting, setConnecting] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [ledgerTransport, setLedgerTransport] = useState<unknown>(null)
+  const [ledgerTransport, setLedgerTransport] = useState<{ close: () => void } | null>(null)
   const [manualHardwareKey, setManualHardwareKey] = useState('')
   const [selectedDerivationPath, setSelectedDerivationPath] = useState(LEDGER_DERIVATION_PATHS[0].path)
   const [safetyInput, setSafetyInput] = useState('https://stellar.org')
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>(() => readSecurityAuditLog())
+  const [auditLog, setAuditLog] = useState<SecurityAuditEntry[]>(() => readSecurityAuditLog())
   const [showSocialRecovery, setShowSocialRecovery] = useState(false)
 
   const phishingState: PhishingState = useMemo(() => detectPhishingRisk(safetyInput), [safetyInput])
@@ -335,7 +332,7 @@ export default function WalletConnect() {
     [phishingState.safe, walletType]
   )
 
-  const refreshAudit = (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => {
+  const refreshAudit = (entry: Omit<SecurityAuditEntry, 'id' | 'timestamp'>) => {
     setAuditLog(appendSecurityAuditLog(entry))
   }
 
@@ -404,7 +401,8 @@ export default function WalletConnect() {
         }
 
         case 'walletconnect': {
-          const result = await connectWalletConnect(network)
+          const wcNetwork = network === 'mainnet' ? 'mainnet' : 'testnet'
+          const result = await connectWalletConnect(wcNetwork)
           await connectCommon('walletconnect', result.publicKey, { mode: 'walletconnect-v2' })
           break
         }
@@ -427,14 +425,19 @@ export default function WalletConnect() {
   }
 
   const handleHardwareConnect = async (walletId: string) => {
+    if (walletId !== 'ledger' && walletId !== 'trezor' && walletId !== 'keystone') {
+      throw new Error(`Unsupported hardware wallet: ${walletId}`)
+    }
+    const hardwareType = walletId as HardwareWalletType
+
     setConnecting(true)
     setConnectingId(walletId)
     setError(null)
 
     try {
-      const result = await connectHardwareWallet(walletId, {
+      const result = await connectHardwareWallet(hardwareType, {
         manualPublicKey: manualHardwareKey,
-        derivationPath: walletId === 'ledger' ? selectedDerivationPath : undefined,
+        derivationPath: hardwareType === 'ledger' ? selectedDerivationPath : undefined,
       })
 
       if (walletId === 'ledger' && result.transport) {

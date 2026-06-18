@@ -1,15 +1,53 @@
 import React, { useEffect, useMemo, useState, type ReactNode } from "react";
+import * as StellarSdk from "@stellar/stellar-sdk";
 import { Droplets, RefreshCw, Search } from "lucide-react";
 import { useStore } from "../../lib/store";
 import {
   fetchAccountLiquidityPoolHistory,
   fetchAccountLiquidityPoolPositions,
   fetchLiquidityPoolsByAssetPair,
+  parseAssetString,
+  type AccountLiquidityPosition,
+  type EnrichedLiquidityPool,
 } from "../../lib/dex";
 import type { LiquidityPool, LiquidityPosition } from "./types";
 
 const DEFAULT_ASSET_A = "native";
 const DEFAULT_ASSET_B = "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
+
+function toLiquidityPool(pool: EnrichedLiquidityPool): LiquidityPool {
+  return {
+    id: pool.id,
+    assetA: pool.assetA,
+    assetB: pool.assetB,
+    assetCodeA: pool.assetCodeA,
+    assetCodeB: pool.assetCodeB,
+    feeBps: pool.feeBps,
+    reserveA: String(pool.reserveA),
+    reserveB: String(pool.reserveB),
+    totalShares: String(pool.totalShares),
+    priceBperA: String(pool.priceBperA),
+    priceAperB: String(pool.priceAperB),
+  };
+}
+
+function toLiquidityPosition(position: AccountLiquidityPosition): LiquidityPosition {
+  return {
+    poolId: position.poolId ?? "",
+    shares: String(position.shares),
+    balance: position.balance,
+    sharePercent: String(position.sharePercent),
+  };
+}
+
+function toAsset(assetInput: string): StellarSdk.Asset {
+  if (!assetInput || assetInput === "native" || assetInput === "XLM") {
+    return StellarSdk.Asset.native();
+  }
+  const parsed = parseAssetString(assetInput);
+  if (parsed.type === "native") return StellarSdk.Asset.native();
+  return new StellarSdk.Asset(parsed.code, parsed.issuer);
+}
 
 function formatNumber(value: string | number, maximumFractionDigits = 7): string {
   const number = Number(value);
@@ -153,8 +191,13 @@ export default function LiquidityPools() {
     setLoading(true);
     setError("");
     try {
-      const records: LiquidityPool[] = await fetchLiquidityPoolsByAssetPair(nextA.trim(), nextB.trim(), network, 20);
-      setPools(records);
+      const records = await fetchLiquidityPoolsByAssetPair(
+        toAsset(nextA.trim()),
+        toAsset(nextB.trim()),
+        network,
+        20,
+      );
+      setPools(records.map(toLiquidityPool));
       setSelectedPoolId(records[0]?.id || null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load liquidity pools.");
@@ -178,8 +221,10 @@ export default function LiquidityPools() {
         fetchAccountLiquidityPoolPositions(connectedAddress, network),
         fetchAccountLiquidityPoolHistory(connectedAddress, network, 80, poolId),
       ]);
-      setPositions(nextPositions);
-      setHistory(nextHistory);
+      setPositions(nextPositions.map(toLiquidityPosition));
+      setHistory(
+        nextHistory.map((entry) => ({ ...entry } as Record<string, unknown>)),
+      );
     } catch {
       setPositions([]);
       setHistory([]);

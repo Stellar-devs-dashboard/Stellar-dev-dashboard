@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useStore } from "../../lib/store";
-import { invokeContractFunction } from "../../lib/contractInvoker";
-import { simulateContractCall, isValidContractId } from "../../lib/stellar";
+import { invokeContractFunction, type ContractInvokeArg } from "../../lib/contractInvoker";
+import { simulateContractCall, isValidContractId, type ContractInvocationArg } from "../../lib/stellar";
 import { addContractInteraction } from "../../lib/storage";
 import { generateId } from "../../lib/notifications";
 import ContractHistory from "./ContractHistory";
@@ -11,7 +11,23 @@ const ARGUMENT_TYPES = [
   { value: "int", label: "Int" },
   { value: "address", label: "Address" },
   { value: "bool", label: "Bool" },
-];
+] as const;
+
+type ContractArgForm = { type: string; value: string };
+
+function normalizeInvocationArgs(args: ContractArgForm[]): ContractInvocationArg[] {
+  return args.map((arg) => ({
+    type: arg.type as ContractInvocationArg["type"],
+    value: arg.value,
+  }));
+}
+
+function normalizeInvokeArgs(args: ContractArgForm[]): ContractInvokeArg[] {
+  return args.map((arg) => ({
+    type: arg.type as ContractInvokeArg["type"],
+    value: arg.value,
+  }));
+}
 
 function Panel({ title, subtitle, children }) {
   return (
@@ -74,7 +90,7 @@ function LabeledField({ label, children }) {
   );
 }
 
-function textInputStyle(hasError = false) {
+function textInputStyle(hasError = false): React.CSSProperties {
   return {
     width: "100%",
     background: "var(--bg-elevated)",
@@ -90,7 +106,7 @@ function textInputStyle(hasError = false) {
   };
 }
 
-function ActionButton({ label, onClick, disabled, tone = "primary" }) {
+function ActionButton({ label, onClick, disabled = false, tone = "primary" }) {
   const palette =
     tone === "secondary"
       ? {
@@ -219,7 +235,7 @@ export default function ContractInteraction() {
       type,
       contractId: form.contractId,
       functionName: form.functionName,
-      args: form.args.filter((arg) => arg.value.trim() !== ""),
+        args: normalizeInvocationArgs(form.args.filter((arg) => arg.value.trim() !== "")),
       sourceAccount: form.sourceAccount || connectedAddress,
       status,
       result,
@@ -234,10 +250,11 @@ export default function ContractInteraction() {
     setSimulateLoading(true);
 
     try {
+      const filteredArgs = form.args.filter((arg) => arg.value.trim() !== "");
       const result = await simulateContractCall({
         contractId: form.contractId,
         functionName: form.functionName,
-        args: form.args.filter((arg) => arg.value.trim() !== ""),
+        args: normalizeInvocationArgs(filteredArgs),
         sourceAccount: form.sourceAccount || connectedAddress,
         network,
       });
@@ -257,10 +274,11 @@ export default function ContractInteraction() {
     setInvokeLoading(true);
 
     try {
+      const filteredArgs = form.args.filter((arg) => arg.value.trim() !== "");
       const result = await invokeContractFunction({
         contractId: form.contractId,
         functionName: form.functionName,
-        args: form.args.filter((arg) => arg.value.trim() !== ""),
+        args: normalizeInvokeArgs(filteredArgs),
         sourceAccount: form.sourceAccount || connectedAddress,
         secretKey: form.secretKey,
         network,

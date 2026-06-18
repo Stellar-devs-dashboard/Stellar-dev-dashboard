@@ -147,7 +147,7 @@ export const LearningHub: React.FC = () => {
 };
 
 const StatCard: React.FC<{
-  icon: React.ComponentType<{ size: number; style?: React.CSSProperties }>;
+  icon: import('../../types/components').IconComponent;
   label: string;
   value: string;
   color: string;
@@ -507,7 +507,7 @@ const TutorialView: React.FC<{
 
 const TabButton: React.FC<{
   label: string;
-  icon: React.ComponentType<{ size: number }>;
+  icon: import('../../types/components').IconComponent;
   active: boolean;
   onClick: () => void;
 }> = ({ label, icon: Icon, active, onClick }) => (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, type CSSProperties } from "react";
 import { parseContractWasm } from "../../lib/contractInvoker";
 import { useStore } from "../../lib/store";
 
@@ -45,7 +45,7 @@ function Panel({ title, subtitle, children }) {
   );
 }
 
-function textInputStyle() {
+function textInputStyle(): CSSProperties {
   return {
     width: "100%",
     background: "var(--bg-elevated)",
@@ -61,7 +61,7 @@ function textInputStyle() {
   };
 }
 
-function ActionButton({ label, onClick, disabled, tone = "primary" }) {
+function ActionButton({ label, onClick, disabled = false, tone = "primary" }) {
   const palette =
     tone === "secondary"
       ? {

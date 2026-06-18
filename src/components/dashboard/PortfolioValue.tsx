@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../lib/store'
-import { fetchPrices, calculatePortfolioValue } from '../../lib/priceFeed'
+import { fetchPrices, refreshPrices, calculatePortfolioValue } from '../../lib/priceFeed'
 import { getServer } from '../../lib/stellar'
 import {
   calculateAssetAllocation,
@@ -100,8 +100,12 @@ export default function PortfolioValue() {
 
   // Determine which asset codes we need prices for
   const assetCodes = useMemo(() => {
-    return balances.map((b) => (b.asset_type === 'native' ? 'XLM' : b.asset_code)).filter(Boolean);
-  }, [balances]);
+    return balances.map((b) => {
+      if (b.asset_type === 'native') return 'XLM'
+      if ('asset_code' in b && typeof b.asset_code === 'string') return b.asset_code
+      return null
+    }).filter((code): code is string => Boolean(code))
+  }, [balances])
 
   useEffect(() => {
     if (assetCodes.length === 0) return;
@@ -129,7 +133,7 @@ export default function PortfolioValue() {
 
     setPricesLoading(true);
     try {
-      const fetched = await refreshPrices(assetCodes);
+      const fetched = await fetchPrices(assetCodes);
       setPrices({ ...prices, ...fetched });
     } catch (err) {
       setPricesError(err.message);
@@ -173,7 +177,7 @@ export default function PortfolioValue() {
     const historicalPerformance = historicalData.map((point) => {
       let totalValue = 0;
       Object.entries(point.balances).forEach(([code, amount]) => {
-        totalValue += amount * (prices[code]?.usd || 0);
+        totalValue += Number(amount) * (prices[code]?.usd || 0);
       });
       return { ...point, value: totalValue };
     });
@@ -507,7 +511,7 @@ function AllocationView({ analytics }) {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value }) => `${name} ${value.toFixed(1)}%`}
+                label={({ name, value }) => `${name} ${Number(value).toFixed(1)}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -523,8 +527,8 @@ function AllocationView({ analytics }) {
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '12px',
                 }}
-                formatter={(value, name, props) => [
-                  `${value.toFixed(2)}% ($${props.payload.valueUsd.toFixed(2)})`,
+                formatter={(value, _name, props) => [
+                  `${Number(value).toFixed(2)}% ($${props.payload.valueUsd.toFixed(2)})`,
                   props.payload.name,
                 ]}
               />
@@ -654,7 +658,7 @@ function PerformanceView({ analytics, portfolio }) {
                 borderRadius: 'var(--radius-sm)',
                 fontSize: '12px',
               }}
-              formatter={(value) => [`$${value.toFixed(2)}`, 'Value']}
+              formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Value']}
             />
             <Line
               type="monotone"
@@ -692,8 +696,8 @@ function PerformanceView({ analytics, portfolio }) {
                 borderRadius: 'var(--radius-sm)',
                 fontSize: '12px',
               }}
-              formatter={(value, name, props) => [
-                `${value.toFixed(2)}% ($${props.payload.value.toFixed(2)})`,
+              formatter={(value, _name, props) => [
+                `${Number(value).toFixed(2)}% ($${Number(props.payload.value).toFixed(2)})`,
                 'Change',
               ]}
             />

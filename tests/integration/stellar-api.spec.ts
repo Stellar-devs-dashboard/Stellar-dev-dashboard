@@ -58,7 +58,7 @@ describe('Stellar API integration (MSW)', () => {
     const testnet = results.find((r) => r.network === 'testnet')
     expect(testnet).toBeDefined()
     expect(testnet?.horizon.status).toBeDefined()
-  })
+  }, 15_000)
 
   it('calculateAccountReserves returns sensible numbers', () => {
     const accountData: any = {

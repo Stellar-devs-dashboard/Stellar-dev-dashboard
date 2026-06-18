@@ -147,7 +147,10 @@ function buildComparison(accounts: (AccountDetails | null)[]): ComparisonData {
     values: homeDomains.map(d => d || '—'),
   });
 
-  const hasThresholds = accounts.map(a => (a?.thresholds?.low_weight && a?.thresholds?.med_weight && a?.thresholds?.high_weight) ? true : false);
+  const hasThresholds = accounts.map(a => {
+    const t = a?.thresholds;
+    return Boolean(t?.low_threshold && t?.med_threshold && t?.high_threshold);
+  });
   rows.push({
     label: 'Thresholds Set',
     values: hasThresholds.map(t => t ? '✓' : '✗'),
@@ -170,12 +173,19 @@ function buildComparison(accounts: (AccountDetails | null)[]): ComparisonData {
 }
 
 export default function AccountComparison() {
-  const { comparisonSlots, addComparisonSlot, removeComparisonSlot, updateComparisonSlot, network } = useStore();
+  const {
+    comparisonSlots,
+    addComparisonSlot,
+    removeComparisonSlot,
+    setComparisonKey,
+    network,
+  } = useStore();
   const [accounts, setAccounts] = useState<(AccountDetails | null)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
 
   const currentSlots = comparisonSlots || [];
+  const slotKeys = currentSlots.map((s: ComparisonSlot) => s.key).join(',');
 
   useEffect(() => {
     if (currentSlots.length === 0) {
@@ -191,8 +201,12 @@ export default function AccountComparison() {
 
       for (const slot of currentSlots) {
         if (cancelled) break;
+        if (!slot.key) {
+          results.push(null);
+          continue;
+        }
         try {
-          const details = await fetchAccountDetails(slot.address);
+          const details = await fetchAccountDetails(slot.key, network);
           results.push(details);
         } catch {
           results.push(null);
@@ -208,27 +222,25 @@ export default function AccountComparison() {
     loadAccounts();
 
     return () => { cancelled = true; };
-  }, [currentSlots.map((s: ComparisonSlot) => s.address).join(',')]);
+  }, [slotKeys, network, currentSlots.length]);
 
   const comparison = useMemo(() => buildComparison(accounts), [accounts]);
 
   const handleAddAccount = () => {
     const address = inputValue.trim();
     if (!address || !isPublicKey(address)) return;
-    addComparisonSlot({ id: `slot-${Date.now()}`, address, label: shortAddress(address, 6) });
+    const nextIndex = currentSlots.length;
+    addComparisonSlot();
+    setComparisonKey(nextIndex, address);
     setInputValue('');
   };
 
   const handleAccountChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const slot = currentSlots[index];
-    if (slot) {
-      updateComparisonSlot(slot.id, { ...slot, address: e.target.value });
-    }
+    setComparisonKey(index, e.target.value);
   };
 
   const handleRemoveAccount = (index: number) => {
-    const slot = currentSlots[index];
-    if (slot) removeComparisonSlot(slot.id);
+    removeComparisonSlot(index);
   };
 
   const allLoaded = accounts.length > 0 && accounts.every(a => a !== null);
@@ -270,11 +282,11 @@ export default function AccountComparison() {
     <MetricCard
       title="Subentries"
       accounts={accounts}
-      format={(a) => a?.num_subentries?.toString() ?? '—'}
+      format={(a) => a?.subentry_count?.toString() ?? '—'}
       highlight={(a) => {
-        if (!a?.num_subentries) return false;
-        const max = Math.max(...accounts.filter(Boolean).map(acc => acc!.num_subentries || 0));
-        return a.num_subentries === max && max > 0;
+        if (!a?.subentry_count) return false;
+        const max = Math.max(...accounts.filter(Boolean).map(acc => acc!.subentry_count || 0));
+        return a.subentry_count === max && max > 0;
       }}
     />
   );
@@ -338,7 +350,7 @@ export default function AccountComparison() {
         {currentSlots.length > 0 && (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {currentSlots.map((slot: ComparisonSlot, index: number) => (
-              <div key={slot.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div key={`${index}-${slot.key}`} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span style={{
                   width: '22px',
                   height: '22px',
@@ -356,7 +368,7 @@ export default function AccountComparison() {
                 </span>
                 <input
                   type="text"
-                  value={slot.address}
+                  value={slot.key}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => handleAccountChange(index, e)}
                   style={{
                     flex: 1,
@@ -372,7 +384,7 @@ export default function AccountComparison() {
                   }}
                 />
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  {accounts[index] ? shortAddress(accounts[index]?.id || '', 6) : '—'}
+                  {accounts[index] ? shortAddress(accounts[index]?.account_id || '', 6) : '—'}
                 </span>
                 <button
                   onClick={() => handleRemoveAccount(index)}
@@ -402,41 +414,20 @@ export default function AccountComparison() {
         </div>
       )}
 
-      {!isLoading && currentSlots.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '36px', marginBottom: '12px', opacity: 0.4 }}>⚖️</div>
-          <div style={{ fontSize: '14px' }}>Add two or more accounts to compare</div>
-          <div style={{ fontSize: '12px', marginTop: '6px' }}>
-            Compare balances, thresholds, signers, and more.
-          </div>
-        </div>
-      )}
-
-      {!isLoading && currentSlots.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
+      {!isLoading && allLoaded && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             {netWorthCard}
             {signerCard}
             {subEntryCard}
           </div>
 
-          <div className="card" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Detailed Comparison
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              {comparison.rows.length > 0 ? (
-                comparison.rows.map((row: AnalysisRow, i: number) => (
-                  <ComparisonRow key={i} label={row.label} values={row.values} highlight={row.highlight} />
-                ))
-              ) : (
-                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                  No comparison data available.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          <Card title="Detailed Comparison">
+            {comparison.rows.map((row, i) => (
+              <ComparisonRow key={i} label={row.label} values={row.values} highlight={row.highlight} />
+            ))}
+          </Card>
+        </>
       )}
     </div>
   );
