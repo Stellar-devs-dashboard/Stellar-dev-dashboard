@@ -339,6 +339,44 @@ export interface AlertEntry {
   severity: 'critical' | 'warning' | 'info'
 }
 
+/** Risk signal from analytics snapshot */
+export interface RiskSignal {
+  id: string
+  label: string
+  active: boolean
+  severity: 'high' | 'medium' | 'low'
+}
+
+/** Account metrics in the analytics snapshot */
+export interface AnalyticsAccountSnapshot {
+  xlmBalance: number
+  trustlineCount: number
+  totalAssets: number
+  nonNativeBalanceCount: number
+}
+
+/** Transaction metrics in the analytics snapshot */
+export interface AnalyticsTransactionSnapshot {
+  totalTransactions: number
+  successfulTransactions: number
+  failedTransactions: number
+  successRate: number
+  weeklyActivity: number
+  averageOperationsPerTx: number
+  opTypeCounts: Record<string, number>
+}
+
+/** Network metrics in the analytics snapshot */
+export interface AnalyticsNetworkSnapshot {
+  latestLedgerSequence: number | null
+  baseFee: number
+  p90Fee: number
+  txSuccessCount: number
+  txFailedCount: number
+  operationCount: number
+  averageCloseSeconds: number
+}
+
 /** Health probe result for a service */
 export interface HealthProbe {
   status: string

@@ -1,8 +1,8 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
-import { Cache, TTL } from './cache.js';
-import { rateLimiter } from './rateLimiter.js';
-import auditTrail from './auditTrail.js';
-import { getCircuitBreaker } from './errorHandling/CircuitBreaker';
+import { Cache, TTL } from './cache';
+import { rateLimiter } from './rateLimiter';
+import auditTrail from './auditTrail';
+import { getCircuitBreaker, type CircuitState } from './errorHandling/CircuitBreaker';
 
 // ─── Cache setup ──────────────────────────────────────────────────────────────
 
@@ -85,11 +85,17 @@ function validateSimulationParams(params: BuildTransactionParams) {
   return { errors, warnings };
 }
 
+export interface SimulationFeeOption {
+  label: string;
+  fee: number;
+  expectedInclusion: 'slow' | 'standard' | 'priority';
+}
+
 export function getSimulationFeeOptions(
   baseFee: number,
   operationCount: number,
   congestion = 0.55
-) {
+): SimulationFeeOption[] {
   const optimized = optimizeTransactionFee(baseFee, operationCount, congestion);
 
   return [
@@ -262,7 +268,7 @@ async function rateLimitedFetch(
 
   try {
     // Log the API call (options without secret headers — sanitized by auditTrail)
-    auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions, {});
+    auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions as Record<string, unknown>, {});
 
     // Check rate limits first
     const check = rateLimiter.checkRequest('stellar_client', rateLimiter.extractEndpoint(url));
@@ -275,7 +281,7 @@ async function rateLimitedFetch(
       );
       const responseTime = Date.now() - startTime;
 
-      auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions, {
+      auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions as Record<string, unknown>, {
         status: response.status,
         responseTime,
         queued: true,
@@ -288,11 +294,11 @@ async function rateLimitedFetch(
     const response = await fetch(url, mergedOptions);
     const responseTime = Date.now() - startTime;
 
-    auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions, {
-      status: response.status,
-      responseTime,
-      queued: false,
-    });
+    auditTrail.logAPICall(url, mergedOptions.method || 'GET', mergedOptions as Record<string, unknown>, {
+        status: response.status,
+        responseTime,
+        queued: false,
+      });
 
     return response;
   } catch (error) {
@@ -486,7 +492,7 @@ export async function fetchAccount(
   network: NetworkName = 'testnet'
 ): Promise<StellarSdk.Horizon.AccountResponse> {
   const cacheKey = `account:${publicKey}:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<StellarSdk.Horizon.AccountResponse>(cacheKey);
   if (cached) return cached;
 
   const breaker = getCircuitBreaker(`horizon:${network}`, { failureThreshold: 5, timeout: 30_000 });
@@ -509,7 +515,11 @@ export async function fetchTransactions(
   hasMore: boolean;
 }> {
   const cacheKey = `transactions:${publicKey}:${network}:${limit}:${cursor || 'null'}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<{
+    records: StellarSdk.Horizon.ServerApi.TransactionRecord[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }>(cacheKey);
   if (cached) return cached;
 
   const server = getServer(network);
@@ -541,7 +551,11 @@ export async function fetchOperations(
   hasMore: boolean;
 }> {
   const cacheKey = `operations:${publicKey}:${network}:${limit}:${cursor || 'null'}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<{
+    records: StellarSdk.Horizon.ServerApi.OperationRecord[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }>(cacheKey);
   if (cached) return cached;
 
   const server = getServer(network);
@@ -567,7 +581,7 @@ export async function fetchAccountOffers(
   network: NetworkName = 'testnet'
 ): Promise<StellarSdk.Horizon.ServerApi.OfferRecord[]> {
   const cacheKey = `offers:${publicKey}:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<StellarSdk.Horizon.ServerApi.OfferRecord[]>(cacheKey);
   if (cached) return cached;
 
   const server = getServer(network);
@@ -582,7 +596,10 @@ export async function fetchTransactionDetails(
   network: NetworkName = 'testnet'
 ): Promise<{ transaction: StellarSdk.Horizon.ServerApi.TransactionRecord, operations: StellarSdk.Horizon.ServerApi.OperationRecord[] }> {
   const cacheKey = `transaction-details:${hash}:${network}`
-  const cached = stellarCache.get(cacheKey)
+  const cached = stellarCache.get<{
+    transaction: StellarSdk.Horizon.ServerApi.TransactionRecord;
+    operations: StellarSdk.Horizon.ServerApi.OperationRecord[];
+  }>(cacheKey)
   if (cached) return cached
 
   const server = getServer(network)
@@ -644,7 +661,7 @@ export async function fetchAccountCreationDate(
   network: NetworkName = 'testnet'
 ): Promise<string | null> {
   const cacheKey = `creation-date:${publicKey}:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<string | null>(cacheKey);
   if (cached) return cached;
 
   const server = getServer(network);
@@ -702,7 +719,7 @@ export interface AccountReserves {
 
 export async function fetchNetworkStats(network: NetworkName = 'testnet'): Promise<NetworkStats> {
   const cacheKey = `network-stats:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<NetworkStats>(cacheKey);
   if (cached) return cached;
 
   const breaker = getCircuitBreaker(`horizon:${network}`, { failureThreshold: 5, timeout: 30_000 });
@@ -800,10 +817,12 @@ function parseTopOfBookPrice(levels: Array<{ price?: string }> = []): number | n
 
 export async function fetchXLMPrice(): Promise<XLMPrice> {
   const cacheKey = 'xlm-price';
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<XLMPrice>(cacheKey);
   if (cached) return cached;
 
-  const response = await fetch(COINGECKO_XLM_PRICE_URL);
+  const response = await fetch(
+    'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd',
+  );
 
   if (!response.ok) {
     throw new Error(`XLM price request failed: ${response.status}`);
@@ -835,7 +854,7 @@ export async function fetchAssetPrice(
   }
 
   const cacheKey = `asset-price:${asset.asset_code}:${asset.asset_issuer}:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<AssetPriceEstimate>(cacheKey);
   if (cached) return cached;
 
   const params = new URLSearchParams({
@@ -938,10 +957,11 @@ export async function fetchContractData(
 
   try {
     const result = await server.getContractData(contractId, scValKey, durability);
+    const entry = result as StellarSdk.SorobanRpc.Api.LedgerEntryResult & { xdr?: string };
     return {
-      key: StellarSdk.scValToNative(result.key),
-      value: StellarSdk.scValToNative(result.val),
-      xdr: result.xdr
+      key: StellarSdk.scValToNative(entry.key as unknown as StellarSdk.xdr.ScVal),
+      value: StellarSdk.scValToNative(entry.val as unknown as StellarSdk.xdr.ScVal),
+      xdr: entry.xdr,
     };
   } catch (e) {
     throw new Error(`Failed to fetch contract data: ${(e as Error).message}`);
@@ -1059,7 +1079,7 @@ function parseContractArgument(arg: ContractInvocationArg, index: number): Stell
   }
 }
 
-interface BuildContractInvocationParams {
+export interface BuildContractInvocationParams {
   contractId: string;
   functionName: string;
   args?: ContractInvocationArg[];
@@ -1235,7 +1255,7 @@ export async function resolveFederatedAddress(
   _network: NetworkName = 'testnet'
 ): Promise<{ accountId: string; memoId?: string; memoType?: string } | null> {
   try {
-    const server = getServer(network);
+    const server = getServer(_network);
 
     // Parse the federated address (name*domain)
     const [name, domain] = federatedAddress.split('*');
@@ -1429,7 +1449,7 @@ export async function fetchClaimableBalances(
   network: NetworkName = 'testnet'
 ): Promise<ClaimableBalanceRecord[]> {
   const cacheKey = `claimable:${publicKey}:${network}`;
-  const cached = stellarCache.get(cacheKey);
+  const cached = stellarCache.get<ClaimableBalanceRecord[]>(cacheKey);
   if (cached) return cached;
 
   const config = NETWORKS[network];
@@ -1572,7 +1592,7 @@ export interface SimulateResult {
 
 export async function simulateTransaction(params: BuildTransactionParams): Promise<SimulateResult> {
   const cacheKey = buildSimulationCacheKey(params);
-  const cached = simulationCache.get(cacheKey);
+  const cached = simulationCache.get<SimulateResult>(cacheKey);
   if (cached) {
     return cached;
   }
@@ -1651,12 +1671,6 @@ export interface SimulationWhatIfScenario {
   baseFee?: number;
   operationMultiplier?: number;
   networkCongestion?: number;
-}
-
-export interface SimulationFeeOption {
-  label: string;
-  fee: number;
-  expectedInclusion: 'slow' | 'standard' | 'priority';
 }
 
 export interface ExecutionTraceStep {

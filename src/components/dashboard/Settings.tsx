@@ -4,7 +4,7 @@ import { useRateLimiter } from "../../hooks/useRateLimiter";
 import { useStore } from "../../lib/store";
 import { getEnvironmentConfig } from "../../lib/config";
 import { getCustomNetworkAuthHeaders } from "../../lib/stellar";
-import { saveAlertRule, getAlertRules, deleteAlertRule } from "../../lib/alertRulesDb";
+import { saveRule, getRules, deleteRule } from "../../lib/alertRulesDb";
 import { ALERT_RULE_TYPE, ALERT_CHANNEL } from "../../lib/alerts";
 import PluginRegistryView from "./PluginRegistryView";
 import DataExport from "./DataExport";

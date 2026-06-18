@@ -40,7 +40,10 @@ export class WASMProcessor {
   }
 
   static async hashBytes(bytes: Uint8Array): Promise<string> {
-    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
 
     if (typeof crypto !== 'undefined' && crypto?.subtle?.digest) {
       const digest = await crypto.subtle.digest('SHA-256', buffer);
@@ -64,7 +67,8 @@ export class WASMProcessor {
     if (type === 'bytes') {
       const normalized = String(value ?? '').replace(/^0x/, '');
       const bytePairs = normalized.match(/.{1,2}/g) || [];
-      return xdr.ScVal.scvBytes(Uint8Array.from(bytePairs.map((pair) => parseInt(pair, 16))));
+      const byteArray = Uint8Array.from(bytePairs.map((pair) => parseInt(pair, 16)));
+      return xdr.ScVal.scvBytes(byteArray as unknown as Buffer);
     }
     return xdr.ScVal.scvString(String(value ?? ''));
   }

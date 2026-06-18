@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { redactSensitive } from '../../src/utils/security.js'
+import { redactSensitive } from '../../src/utils/security'
 
 describe('redactSensitive', () => {
   it('redacts nested sensitive fields in objects', () => {

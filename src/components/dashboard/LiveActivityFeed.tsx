@@ -3,7 +3,9 @@ import Card from './Card'
 import { useStore } from '../../lib/store'
 import { useAccountStream } from '../../hooks/useAccountStream'
 
-const CHANNELS = [
+import type { AccountStreamChannel, AccountStreamEvent } from '../../lib/websocket/StreamTypes'
+
+const CHANNELS: { id: AccountStreamChannel; label: string }[] = [
   { id: 'effects', label: 'Effects' },
   { id: 'payments', label: 'Payments' },
   { id: 'operations', label: 'Operations' },
@@ -25,8 +27,8 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString()
 }
 
-function describeEvent(event: { channel: string; record?: Record<string, unknown> }): string {
-  const r = event.record ?? {}
+function describeEvent(event: AccountStreamEvent): string {
+  const r = event.record as Record<string, unknown>
   if (event.channel === 'payments') {
     const amount = (r.amount as string) ?? '?'
     const asset = (r.asset_code as string) ?? 'XLM'
@@ -53,7 +55,7 @@ function truncate(s: unknown): string {
 
 export default function LiveActivityFeed() {
   const { connectedAddress, network } = useStore()
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(['effects', 'payments'])
+  const [selectedChannels, setSelectedChannels] = useState<AccountStreamChannel[]>(['effects', 'payments'])
   const [isStale, setIsStale] = useState(false)
 
   const { events, status, lastEventAt, errored } = useAccountStream(
@@ -86,7 +88,7 @@ export default function LiveActivityFeed() {
     setIsStale(false)
   }, [connectedAddress, network])
 
-  const toggleChannel = (id: string) => {
+  const toggleChannel = (id: AccountStreamChannel) => {
     setSelectedChannels((prev) => {
       if (prev.includes(id)) {
         if (prev.length === 1) return prev
@@ -223,7 +225,7 @@ export default function LiveActivityFeed() {
             Waiting for new {selectedChannels.join(', ')} events…
           </div>
         ) : (
-          events.map((event: { pagingToken: string; receivedAt: number; channel: string; record?: Record<string, unknown> }, idx: number) => (
+          events.map((event, idx) => (
             <div
               key={`${event.pagingToken}-${idx}`}
               style={{

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useStore } from '../../lib/store'
-import { buildTransaction, simulateTransaction, exportTransactionXDR } from '../../lib/stellar'
+import { buildTransaction, simulateTransaction, exportTransactionXDR, type BuilderOperation as StellarBuilderOperation, type SimulateResult } from '../../lib/stellar'
 import AdvancedTransactionSimulation from './AdvancedTransactionSimulation'
 import { StatCard } from './Card'
 import { Plus, Trash2, Play, Copy, AlertCircle, CheckCircle } from 'lucide-react'
+import type { BuilderOperation as DashboardBuilderOperation } from './types'
 
 const OPERATION_TYPES = [
   { id: 'payment', label: 'Payment', icon: '→' },
@@ -16,12 +17,12 @@ const OPERATION_TYPES = [
 
 export default function Builder() {
   const { network } = useStore()
-  const [operations, setOperations] = useState([])
+  const [operations, setOperations] = useState<DashboardBuilderOperation[]>([])
   const [memo, setMemo] = useState('')
   const [baseFee, setBaseFee] = useState('100')
   const [timeBounds, setTimeBounds] = useState({ minTime: '', maxTime: '' })
   const [sourceAccount, setSourceAccount] = useState('')
-  const [simulation, setSimulation] = useState(null)
+  const [simulation, setSimulation] = useState<SimulateResult | null>(null)
   const [isSimulating, setIsSimulating] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -46,8 +47,8 @@ export default function Builder() {
     setSuccess('')
   }, [network])
 
-  const addOperation = (type) => {
-    const newOp = {
+  const addOperation = (type: string) => {
+    const newOp: DashboardBuilderOperation = {
       id: Date.now(),
       type,
     }
@@ -77,13 +78,13 @@ export default function Builder() {
     setOperations([...operations, newOp])
   }
 
-  const updateOperation = (id, field, value) => {
+  const updateOperation = (id: number, field: string, value: string) => {
     setOperations(ops => ops.map(op => 
       op.id === id ? { ...op, [field]: value } : op
     ))
   }
 
-  const removeOperation = (id) => {
+  const removeOperation = (id: number) => {
     setOperations(ops => ops.filter(op => op.id !== id))
   }
 
@@ -100,7 +101,7 @@ export default function Builder() {
     try {
       const result = await simulateTransaction({
         sourceAccount,
-        operations,
+        operations: operations as StellarBuilderOperation[],
         memo,
         baseFee: parseInt(baseFee),
         timeBounds,
@@ -108,7 +109,7 @@ export default function Builder() {
       })
       setSimulation(result)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : 'Simulation failed')
     } finally {
       setIsSimulating(false)
     }
@@ -123,7 +124,7 @@ export default function Builder() {
     try {
       const xdr = await exportTransactionXDR({
         sourceAccount,
-        operations,
+        operations: operations as StellarBuilderOperation[],
         memo,
         baseFee: parseInt(baseFee),
         timeBounds,
@@ -134,7 +135,7 @@ export default function Builder() {
       setSuccess('Transaction XDR copied to clipboard!')
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : 'Export failed')
     }
   }
 
@@ -423,13 +424,6 @@ export default function Builder() {
                 value={simulation.operationCount} 
                 accent="var(--green)" 
               />
-              {simulation.resourceUsage && (
-                <StatCard 
-                  label="CPU Instructions" 
-                  value={simulation.resourceUsage.cpuInstructions?.toLocaleString()} 
-                  accent="var(--amber)" 
-                />
-              )}
             </div>
             
             {simulation.warnings && simulation.warnings.length > 0 && (
@@ -510,8 +504,19 @@ export default function Builder() {
   )
 }
 
-function OperationCard({ operation, index, onUpdate, onRemove }) {
+function OperationCard({
+  operation,
+  index,
+  onUpdate,
+  onRemove,
+}: {
+  operation: DashboardBuilderOperation
+  index: number
+  onUpdate: (id: number, field: string, value: string) => void
+  onRemove: (id: number) => void
+}) {
   const { type } = operation
+  const str = (value: unknown) => (value == null ? '' : String(value))
   
   const getTypeLabel = () => {
     switch (type) {
@@ -581,7 +586,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="G..."
-                value={operation.destination}
+                value={str(operation.destination)}
                 onChange={(e) => onUpdate(operation.id, 'destination', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -591,7 +596,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
                 Asset
               </label>
               <select
-                value={operation.asset}
+                value={str(operation.asset)}
                 onChange={(e) => onUpdate(operation.id, 'asset', e.target.value)}
                 style={{...fieldInputStyle, fontFamily: 'inherit'}}
               >
@@ -605,7 +610,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="0.0000000"
-                value={operation.amount}
+                value={str(operation.amount)}
                 onChange={(e) => onUpdate(operation.id, 'amount', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -622,7 +627,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="G..."
-                value={operation.destination}
+                value={str(operation.destination)}
                 onChange={(e) => onUpdate(operation.id, 'destination', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -634,7 +639,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="1.0000000"
-                value={operation.startingBalance}
+                value={str(operation.startingBalance)}
                 onChange={(e) => onUpdate(operation.id, 'startingBalance', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -651,7 +656,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="USDC"
-                value={operation.assetCode || ''}
+                value={str(operation.assetCode)}
                 onChange={(e) => onUpdate(operation.id, 'assetCode', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -663,7 +668,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="G..."
-                value={operation.assetIssuer || ''}
+                value={str(operation.assetIssuer)}
                 onChange={(e) => onUpdate(operation.id, 'assetIssuer', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -675,7 +680,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="G..."
-                value={operation.from || ''}
+                value={str(operation.from)}
                 onChange={(e) => onUpdate(operation.id, 'from', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -687,7 +692,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="0.0000000"
-                value={operation.amount || ''}
+                value={str(operation.amount)}
                 onChange={(e) => onUpdate(operation.id, 'amount', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -703,7 +708,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
             <input
               type="text"
               placeholder="G..."
-              value={operation.sponsoredId || ''}
+              value={str(operation.sponsoredId)}
               onChange={(e) => onUpdate(operation.id, 'sponsoredId', e.target.value)}
               style={fieldInputStyle}
             />
@@ -725,7 +730,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="text"
                 placeholder="G... account paying fee-bump fee"
-                value={operation.feeSource || ''}
+                value={str(operation.feeSource)}
                 onChange={(e) => onUpdate(operation.id, 'feeSource', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -737,7 +742,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               <input
                 type="number"
                 placeholder="100"
-                value={operation.baseFee || ''}
+                value={str(operation.baseFee)}
                 onChange={(e) => onUpdate(operation.id, 'baseFee', e.target.value)}
                 style={fieldInputStyle}
               />
@@ -748,7 +753,7 @@ function OperationCard({ operation, index, onUpdate, onRemove }) {
               </label>
               <textarea
                 placeholder="Paste the signed inner transaction XDR envelope here"
-                value={operation.innerTransaction || ''}
+                value={str(operation.innerTransaction)}
                 onChange={(e) => onUpdate(operation.id, 'innerTransaction', e.target.value)}
                 style={{
                   ...fieldInputStyle,

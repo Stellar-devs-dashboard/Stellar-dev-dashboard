@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, type MouseEvent, type 
 import { useStore } from '../../lib/store';
 import { formatDistanceToNow } from 'date-fns';
 import Card from './Card';
-import type { AuditEntry } from '../../types/audit';
+import type { AuditEntry } from '../../utils/audit';
 
 interface LogRowProps {
   entry: AuditEntry
@@ -94,7 +94,7 @@ const LogRow = ({ entry, isSelected, onSelect }: LogRowProps) => (
       whiteSpace: 'nowrap',
       fontFamily: 'var(--font-mono)',
     }}>
-      {entry.message}
+      {entry.action}
     </div>
     <div style={{
       color: 'var(--text-muted)',
@@ -308,7 +308,7 @@ export default function AuditLog() {
     if (filters.search) {
       const q = filters.search.toLowerCase();
       return (
-        entry.message.toLowerCase().includes(q) ||
+        entry.action.toLowerCase().includes(q) ||
         entry.category.toLowerCase().includes(q) ||
         entry.severity.toLowerCase().includes(q)
       );
@@ -429,7 +429,7 @@ export default function AuditLog() {
                     lineHeight: 1.5,
                     wordBreak: 'break-word',
                   }}>
-                    {selectedEntry.message}
+                    {selectedEntry.action}
                   </div>
                 </div>
                 {selectedEntry.metadata && Object.keys(selectedEntry.metadata).length > 0 && (

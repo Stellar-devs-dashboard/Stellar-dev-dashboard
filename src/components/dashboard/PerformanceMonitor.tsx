@@ -17,11 +17,39 @@ import {
   MousePointerClick,
 } from "lucide-react";
 
+interface WebVitalMetric {
+  value: number
+  budget?: number
+  withinBudget: boolean
+}
+
+interface BudgetViolation {
+  metric: string
+  value: number
+  budget: number
+  overage: number
+}
+
+interface MetricsSummary {
+  webVitals: Record<string, WebVitalMetric>
+  customMetrics: Record<string, WebVitalMetric & { average?: number; min?: number; max?: number; count?: number }>
+  resources: {
+    total: number
+    totalSize: number
+    byType: Record<string, { count: number; totalSize: number; totalDuration: number }>
+  }
+  interactions: {
+    total: number
+    recent: unknown[]
+  }
+  budgetViolations: BudgetViolation[]
+}
+
 /**
  * Performance Monitor Dashboard Component
  */
 export default function PerformanceMonitor() {
-  const [summary, setSummary] = useState(null);
+  const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [score, setScore] = useState(100);
   const [bundleAnalysis, setBundleAnalysis] = useState(null);
   const [activeTab, setActiveTab] = useState("vitals");
@@ -53,7 +81,7 @@ export default function PerformanceMonitor() {
   }, []);
 
   function updateMetrics() {
-    setSummary(getMetricsSummary());
+    setSummary(getMetricsSummary() as MetricsSummary);
     setScore(getPerformanceScore());
     setBundleAnalysis(getBundleAnalysis());
   }

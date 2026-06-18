@@ -6,7 +6,7 @@ import BalanceHistoryChart from '../charts/BalanceHistoryChart'
 import AdvancedChartSuite from '../charts/AdvancedChartSuite'
 
 const ChartsTab: ComponentType = () => {
-  const { t } = useTranslation() as { t: (key: string) => string }
+  const { t } = useTranslation()
 
   return (
     <div
@@ -20,7 +20,7 @@ const ChartsTab: ComponentType = () => {
           fontWeight: 700,
         }}
       >
-        {t('charts.title')}
+        {t('charts.title', {})}
       </div>
       <NetworkMetricsChart />
       <AccountActivityChart />

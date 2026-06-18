@@ -1,16 +1,67 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, type ReactNode, type CSSProperties } from "react";
 import { useStore } from "../../lib/store";
 import { OPERATION_TYPES, simulateTransaction, buildTransaction } from "../../lib/transactionBuilder";
-import { validateOperation } from "../../utils/transactionValidation";
-import { TRANSACTION_TEMPLATES } from "../../lib/transactionTemplates.js";
+import { validateOperation, type FieldError } from "../../utils/transactionValidation";
+import { TRANSACTION_TEMPLATES } from "../../lib/transactionTemplates";
 import {
   getCachedUserTransactionTemplates,
   upsertUserTransactionTemplate,
+  type TransactionTemplate,
 } from "../../lib/transactionTemplateVault.ts";
 import { fetchContractData } from "../../lib/stellar";
 import { Copy, Play, Download, AlertCircle, CheckCircle, ArrowDown, GripVertical, Trash2, Plus, Zap } from "lucide-react";
 
-function Panel({ title, subtitle, children }) {
+interface PanelProps {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  children?: ReactNode;
+}
+
+interface LabeledFieldProps {
+  label: ReactNode;
+  children?: ReactNode;
+  style?: CSSProperties;
+}
+
+interface ActionButtonProps {
+  label: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "primary" | "secondary";
+}
+
+interface HostFunctionArg {
+  type: string;
+  value: string;
+}
+
+interface BuilderOperation {
+  id: number;
+  type: string;
+  params: Record<string, unknown>;
+}
+
+interface SimulationResult {
+  success: boolean;
+  errors: string[];
+  fee: number;
+  operationCount: number;
+  xdr?: string;
+  hash?: string;
+}
+
+interface ContractInspectData {
+  key: unknown;
+  value: unknown;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+type MemoType = "text" | "id" | "hash" | "return";
+
+function Panel({ title, subtitle, children }: PanelProps) {
   return (
     <div
       style={{
@@ -53,9 +104,9 @@ function Panel({ title, subtitle, children }) {
   );
 }
 
-function LabeledField({ label, children }) {
+function LabeledField({ label, children, style }: LabeledFieldProps) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <label style={{ display: "flex", flexDirection: "column", gap: "8px", ...style }}>
       <span
         style={{
           fontSize: "11px",
@@ -71,7 +122,7 @@ function LabeledField({ label, children }) {
   );
 }
 
-function textInputStyle(hasError = false) {
+function textInputStyle(hasError = false): CSSProperties {
   return {
     width: "100%",
     background: "var(--bg-elevated)",
@@ -87,7 +138,7 @@ function textInputStyle(hasError = false) {
   };
 }
 
-function ActionButton({ label, onClick, disabled, tone = "primary" }) {
+function ActionButton({ label, onClick, disabled = false, tone = "primary" }: ActionButtonProps) {
   const palette =
     tone === "secondary"
       ? {
@@ -123,9 +174,9 @@ function ActionButton({ label, onClick, disabled, tone = "primary" }) {
   );
 }
 
-function getAllTransactionTemplates() {
+function getAllTransactionTemplates(): TransactionTemplate[] {
   const user = getCachedUserTransactionTemplates();
-  const byId = new Map();
+  const byId = new Map<string, TransactionTemplate>();
   [...user, ...TRANSACTION_TEMPLATES].forEach((t) => {
     if (!t?.id) return;
     byId.set(t.id, t);
@@ -139,10 +190,10 @@ export default function TransactionBuilder() {
 
   const [sourceAccount, setSourceAccount] = useState(connectedAddress || "");
   const [memo, setMemo] = useState("");
-  const [memoType, setMemoType] = useState("text");
+  const [memoType, setMemoType] = useState<MemoType>("text");
   const [baseFee, setBaseFee] = useState("100");
   const [timeout, setTimeout] = useState("180");
-  const [operations, setOperations] = useState([
+  const [operations, setOperations] = useState<BuilderOperation[]>([
     {
       id: Date.now(),
       type: "payment",
@@ -150,13 +201,13 @@ export default function TransactionBuilder() {
     },
   ]);
   
-  const [simulation, setSimulation] = useState(null);
+  const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [showXDR, setShowXDR] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [inspectContractId, setInspectContractId] = useState("");
   const [inspectContractKey, setInspectContractKey] = useState("");
-  const [inspectContractData, setInspectContractData] = useState(null);
+  const [inspectContractData, setInspectContractData] = useState<ContractInspectData | null>(null);
   const [inspectContractLoading, setInspectContractLoading] = useState(false);
   const [inspectContractError, setInspectContractError] = useState("");
 
@@ -171,22 +222,22 @@ export default function TransactionBuilder() {
     ]);
   }
 
-  function removeOperation(id) {
+  function removeOperation(id: number) {
     setOperations(operations.filter((op) => op.id !== id));
   }
 
-  function updateOperation(id, field, value) {
-    const updated = operations.map(op => {
+  function updateOperation(id: number, field: string, value: unknown) {
+    const updated = operations.map((op) => {
       if (op.id !== id) return op;
       if (field === "type") {
-        return { ...op, type: value, params: {} };
+        return { ...op, type: value as string, params: {} };
       }
       return { ...op, params: { ...op.params, [field]: value } };
     });
     setOperations(updated);
   }
   
-  function duplicateOperation(id) {
+  function duplicateOperation(id: number) {
     const opToDuplicate = operations.find(op => op.id === id);
     if (!opToDuplicate) return;
     const newOp = { ...opToDuplicate, id: Date.now(), params: { ...opToDuplicate.params } };
@@ -196,15 +247,16 @@ export default function TransactionBuilder() {
     setOperations(updated);
   }
   
-  function loadTemplate(templateKey) {
+  function loadTemplate(templateKey: string) {
     const template = availableTemplates.find((t) => t.id === templateKey);
     if (!template) return;
     setMemo(template.memo || "");
-    setMemoType(template.memoType || "text");
+    setMemoType((template.memoType as MemoType) || "text");
     setOperations(
       (template.operations || []).map((op) => ({
-        ...op,
         id: Date.now() + Math.random(),
+        type: op.type,
+        params: { ...(op.params ?? {}) },
       })),
     );
   }
@@ -229,19 +281,19 @@ export default function TransactionBuilder() {
         network
       );
       setInspectContractData(data);
-    } catch (error) {
-      setInspectContractError(error.message || "Failed to fetch contract data");
+    } catch (error: unknown) {
+      setInspectContractError(getErrorMessage(error) || "Failed to fetch contract data");
     } finally {
       setInspectContractLoading(false);
     }
   }
   
   // Drag and drop handlers
-  function handleDragStart(index) {
+  function handleDragStart(index: number) {
     setDraggedIndex(index);
   }
   
-  function handleDragOver(e, index) {
+  function handleDragOver(e: React.DragEvent, index: number) {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
     
@@ -259,12 +311,15 @@ export default function TransactionBuilder() {
   
   // Validation
   const validationErrors = useMemo(() => {
-    const errors = {};
+    const errors: Record<number, FieldError[]> = {};
     operations.forEach((op) => {
       const opErrors = validateOperation(op.type, op.params || {});
 
       if (op.type === "feeBump" && operations.length > 1) {
-        opErrors.push("Fee bump must be a standalone transaction.");
+        opErrors.push({
+          field: "type",
+          message: "Fee bump must be a standalone transaction.",
+        });
       }
 
       if (opErrors.length > 0) {
@@ -294,10 +349,10 @@ export default function TransactionBuilder() {
         network
       });
       setSimulation(result);
-    } catch (error) {
+    } catch (error: unknown) {
       setSimulation({
         success: false,
-        errors: [error.message],
+        errors: [getErrorMessage(error)],
         fee: 0,
         operationCount: operations.length
       });
@@ -320,8 +375,8 @@ export default function TransactionBuilder() {
       const xdr = transaction.toXDR();
       await navigator.clipboard.writeText(xdr);
       alert("Transaction XDR copied to clipboard!");
-    } catch (error) {
-      alert(`Export failed: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`Export failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -344,13 +399,32 @@ export default function TransactionBuilder() {
     try {
       await upsertUserTransactionTemplate(passphrase, template);
       window.alert("Template saved (encrypted). You can export it from Contract Templates → Transaction Templates.");
-    } catch (error) {
-      window.alert(`Save failed: ${error.message}`);
+    } catch (error: unknown) {
+      window.alert(`Save failed: ${getErrorMessage(error)}`);
     }
   }
 
-  function renderOperationFields(op) {
-    const hasErrors = validationErrors[op.id];
+  function getParamString(params: Record<string, unknown>, key: string): string {
+    const value = params[key];
+    return typeof value === "string" ? value : "";
+  }
+
+  function getHostFunctionArgs(params: Record<string, unknown>): HostFunctionArg[] {
+    const value = params.args;
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (arg): arg is HostFunctionArg =>
+        typeof arg === "object" &&
+        arg !== null &&
+        "type" in arg &&
+        "value" in arg &&
+        typeof (arg as HostFunctionArg).type === "string" &&
+        typeof (arg as HostFunctionArg).value === "string",
+    );
+  }
+
+  function renderOperationFields(op: BuilderOperation) {
+    const hasErrors = Boolean(validationErrors[op.id]);
     
     switch (op.type) {
       case "payment":
@@ -358,7 +432,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Destination">
               <input
-                value={op.params.destination || ""}
+                value={getParamString(op.params, "destination")}
                 onChange={(e) =>
                   updateOperation(op.id, "destination", e.target.value)
                 }
@@ -368,7 +442,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Amount">
               <input
-                value={op.params.amount || ""}
+                value={getParamString(op.params, "amount")}
                 onChange={(e) =>
                   updateOperation(op.id, "amount", e.target.value)
                 }
@@ -384,7 +458,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Destination">
               <input
-                value={op.params.destination || ""}
+                value={getParamString(op.params, "destination")}
                 onChange={(e) =>
                   updateOperation(op.id, "destination", e.target.value)
                 }
@@ -394,7 +468,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Starting Balance">
               <input
-                value={op.params.startingBalance || ""}
+                value={getParamString(op.params, "startingBalance")}
                 onChange={(e) =>
                   updateOperation(op.id, "startingBalance", e.target.value)
                 }
@@ -410,7 +484,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Asset Code">
               <input
-                value={op.params.assetCode || ""}
+                value={getParamString(op.params, "assetCode")}
                 onChange={(e) =>
                   updateOperation(op.id, "assetCode", e.target.value)
                 }
@@ -420,7 +494,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Asset Issuer">
               <input
-                value={op.params.assetIssuer || ""}
+                value={getParamString(op.params, "assetIssuer")}
                 onChange={(e) =>
                   updateOperation(op.id, "assetIssuer", e.target.value)
                 }
@@ -430,7 +504,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Limit (optional)">
               <input
-                value={op.params.limit || ""}
+                value={getParamString(op.params, "limit")}
                 onChange={(e) =>
                   updateOperation(op.id, "limit", e.target.value)
                 }
@@ -445,7 +519,7 @@ export default function TransactionBuilder() {
         return (
           <LabeledField label="Destination">
             <input
-              value={op.params.destination || ""}
+              value={getParamString(op.params, "destination")}
               onChange={(e) =>
                 updateOperation(op.id, "destination", e.target.value)
               }
@@ -460,7 +534,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Data Name">
               <input
-                value={op.params.name || ""}
+                value={getParamString(op.params, "name")}
                 onChange={(e) => updateOperation(op.id, "name", e.target.value)}
                 placeholder="key"
                 style={textInputStyle(hasErrors)}
@@ -468,7 +542,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Data Value">
               <input
-                value={op.params.value || ""}
+                value={getParamString(op.params, "value")}
                 onChange={(e) =>
                   updateOperation(op.id, "value", e.target.value)
                 }
@@ -485,7 +559,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Selling Asset Type">
               <select
-                value={op.params.sellingAssetType || "native"}
+                value={getParamString(op.params, "sellingAssetType") || "native"}
                 onChange={(e) => updateOperation(op.id, "sellingAssetType", e.target.value)}
                 style={textInputStyle()}
               >
@@ -493,11 +567,11 @@ export default function TransactionBuilder() {
                 <option value="credit">Credit Asset</option>
               </select>
             </LabeledField>
-            {op.params.sellingAssetType === "credit" && (
+            {getParamString(op.params, "sellingAssetType") === "credit" && (
               <>
                 <LabeledField label="Selling Asset Code">
                   <input
-                    value={op.params.sellingAssetCode || ""}
+                    value={getParamString(op.params, "sellingAssetCode")}
                     onChange={(e) => updateOperation(op.id, "sellingAssetCode", e.target.value)}
                     placeholder="USDC"
                     style={textInputStyle()}
@@ -505,7 +579,7 @@ export default function TransactionBuilder() {
                 </LabeledField>
                 <LabeledField label="Selling Asset Issuer">
                   <input
-                    value={op.params.sellingAssetIssuer || ""}
+                    value={getParamString(op.params, "sellingAssetIssuer")}
                     onChange={(e) => updateOperation(op.id, "sellingAssetIssuer", e.target.value)}
                     placeholder="G..."
                     style={textInputStyle()}
@@ -515,7 +589,7 @@ export default function TransactionBuilder() {
             )}
             <LabeledField label="Buying Asset Type">
               <select
-                value={op.params.buyingAssetType || "native"}
+                value={getParamString(op.params, "buyingAssetType") || "native"}
                 onChange={(e) => updateOperation(op.id, "buyingAssetType", e.target.value)}
                 style={textInputStyle()}
               >
@@ -523,11 +597,11 @@ export default function TransactionBuilder() {
                 <option value="credit">Credit Asset</option>
               </select>
             </LabeledField>
-            {op.params.buyingAssetType === "credit" && (
+            {getParamString(op.params, "buyingAssetType") === "credit" && (
               <>
                 <LabeledField label="Buying Asset Code">
                   <input
-                    value={op.params.buyingAssetCode || ""}
+                    value={getParamString(op.params, "buyingAssetCode")}
                     onChange={(e) => updateOperation(op.id, "buyingAssetCode", e.target.value)}
                     placeholder="USDC"
                     style={textInputStyle()}
@@ -535,7 +609,7 @@ export default function TransactionBuilder() {
                 </LabeledField>
                 <LabeledField label="Buying Asset Issuer">
                   <input
-                    value={op.params.buyingAssetIssuer || ""}
+                    value={getParamString(op.params, "buyingAssetIssuer")}
                     onChange={(e) => updateOperation(op.id, "buyingAssetIssuer", e.target.value)}
                     placeholder="G..."
                     style={textInputStyle()}
@@ -545,7 +619,7 @@ export default function TransactionBuilder() {
             )}
             <LabeledField label={op.type === "manageSellOffer" ? "Amount" : "Buy Amount"}>
               <input
-                value={op.type === "manageSellOffer" ? (op.params.amount || "") : (op.params.buyAmount || "")}
+                value={op.type === "manageSellOffer" ? getParamString(op.params, "amount") : getParamString(op.params, "buyAmount")}
                 onChange={(e) => updateOperation(op.id, op.type === "manageSellOffer" ? "amount" : "buyAmount", e.target.value)}
                 placeholder="100"
                 style={textInputStyle()}
@@ -553,7 +627,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Price">
               <input
-                value={op.params.price || ""}
+                value={getParamString(op.params, "price")}
                 onChange={(e) => updateOperation(op.id, "price", e.target.value)}
                 placeholder="1.5"
                 style={textInputStyle()}
@@ -567,7 +641,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Fee Source Account">
               <input
-                value={op.params.feeSource || ""}
+                value={getParamString(op.params, "feeSource")}
                 onChange={(e) =>
                   updateOperation(op.id, "feeSource", e.target.value)
                 }
@@ -578,7 +652,7 @@ export default function TransactionBuilder() {
             <LabeledField label="Base Fee (stroops)">
               <input
                 type="number"
-                value={op.params.baseFee || ""}
+                value={getParamString(op.params, "baseFee")}
                 onChange={(e) =>
                   updateOperation(op.id, "baseFee", e.target.value)
                 }
@@ -588,7 +662,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Inner Transaction XDR">
               <textarea
-                value={op.params.innerTransaction || ""}
+                value={getParamString(op.params, "innerTransaction")}
                 onChange={(e) =>
                   updateOperation(op.id, "innerTransaction", e.target.value)
                 }
@@ -609,7 +683,7 @@ export default function TransactionBuilder() {
         return (
           <LabeledField label="Sponsored Account ID">
             <input
-              value={op.params.sponsoredId || ""}
+              value={getParamString(op.params, "sponsoredId")}
               onChange={(e) =>
                 updateOperation(op.id, "sponsoredId", e.target.value)
               }
@@ -631,7 +705,7 @@ export default function TransactionBuilder() {
           <>
             <LabeledField label="Asset Code">
               <input
-                value={op.params.assetCode || ""}
+                value={getParamString(op.params, "assetCode")}
                 onChange={(e) =>
                   updateOperation(op.id, "assetCode", e.target.value)
                 }
@@ -641,7 +715,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Asset Issuer">
               <input
-                value={op.params.assetIssuer || ""}
+                value={getParamString(op.params, "assetIssuer")}
                 onChange={(e) =>
                   updateOperation(op.id, "assetIssuer", e.target.value)
                 }
@@ -651,7 +725,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="From Account">
               <input
-                value={op.params.from || ""}
+                value={getParamString(op.params, "from")}
                 onChange={(e) =>
                   updateOperation(op.id, "from", e.target.value)
                 }
@@ -661,7 +735,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Amount">
               <input
-                value={op.params.amount || ""}
+                value={getParamString(op.params, "amount")}
                 onChange={(e) =>
                   updateOperation(op.id, "amount", e.target.value)
                 }
@@ -673,12 +747,12 @@ export default function TransactionBuilder() {
         );
 
       case "invokeHostFunction": {
-        const args = op.params.args || [];
+        const args = getHostFunctionArgs(op.params);
         return (
           <>
             <LabeledField label="Contract ID">
               <input
-                value={op.params.contractId || ""}
+                value={getParamString(op.params, "contractId")}
                 onChange={(e) =>
                   updateOperation(op.id, "contractId", e.target.value)
                 }
@@ -688,7 +762,7 @@ export default function TransactionBuilder() {
             </LabeledField>
             <LabeledField label="Function Name">
               <input
-                value={op.params.functionName || ""}
+                value={getParamString(op.params, "functionName")}
                 onChange={(e) =>
                   updateOperation(op.id, "functionName", e.target.value)
                 }
@@ -838,7 +912,7 @@ export default function TransactionBuilder() {
             >
               <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
                 <Zap size={14} style={{ display: "inline", marginRight: "6px", color: "var(--cyan)" }} />
-                {template.label || template.name || template.id}
+                {template.label || template.id}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-muted)", lineHeight: 1.4 }}>
                 {template.description}
@@ -972,7 +1046,7 @@ export default function TransactionBuilder() {
           <LabeledField label="Memo Type">
             <select
               value={memoType}
-              onChange={(e) => setMemoType(e.target.value)}
+              onChange={(e) => setMemoType(e.target.value as MemoType)}
               style={textInputStyle()}
             >
               <option value="text">Text</option>
@@ -1027,7 +1101,7 @@ export default function TransactionBuilder() {
                   </div>
                   {validationErrors[op.id] && (
                     <div style={{ fontSize: "10px", color: "var(--red)" }}>
-                      {validationErrors[op.id].join(", ")}
+                      {validationErrors[op.id].map((e) => e.message).join(", ")}
                     </div>
                   )}
                 </div>
@@ -1134,7 +1208,7 @@ export default function TransactionBuilder() {
                   marginBottom: "12px",
                 }}>
                   {validationErrors[op.id].map((err, i) => (
-                    <div key={i}>• {err}</div>
+                    <div key={i}>• {err.message}</div>
                   ))}
                 </div>
               )}

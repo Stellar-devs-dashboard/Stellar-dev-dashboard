@@ -14,12 +14,21 @@
  */
 
 import { getServer } from './stellar'
-import type { Transaction } from 'stellar-sdk'
+import type { Horizon } from '@stellar/stellar-sdk'
+
+/** Horizon stream payload — operations may be embedded or fetched separately */
+export interface StreamedTransaction {
+  id: string
+  source_account?: string
+  successful?: boolean
+  created_at?: string
+  operations?: Array<Record<string, string | undefined> & { type: string }>
+}
 
 export interface TransactionNotification {
   id: string
   accountId: string
-  transaction: any
+  transaction: StreamedTransaction
   timestamp: number
   type: 'payment' | 'trade' | 'contract' | 'other'
   amount?: string
@@ -178,11 +187,13 @@ class TransactionNotificationStore {
         .transactions()
         .forAccount(accountId)
         .stream({
-          onmessage: (tx: any) => {
-            this.handleNewTransaction(tx, accountId, network)
+          onmessage: (page: Horizon.ServerApi.CollectionPage<Horizon.ServerApi.TransactionRecord>) => {
+            for (const tx of page.records ?? []) {
+              this.handleNewTransaction(this.toStreamedTransaction(tx), accountId, network)
+            }
           },
-          onerror: (err: Error) => {
-            console.error(`Transaction stream error for ${accountId}:`, err)
+          onerror: (event: MessageEvent) => {
+            console.error(`Transaction stream error for ${accountId}:`, event)
           },
         })
 
@@ -220,9 +231,22 @@ class TransactionNotificationStore {
   }
 
   /**
+   * Horizon stream records omit embedded operations — normalize for categorization.
+   */
+  private toStreamedTransaction(tx: Horizon.ServerApi.TransactionRecord): StreamedTransaction {
+    return {
+      id: tx.id,
+      source_account: tx.source_account,
+      created_at: tx.created_at,
+      successful: tx.successful,
+      operations: [],
+    }
+  }
+
+  /**
    * Parse and categorize transaction
    */
-  private categorizeTransaction(tx: any): {
+  private categorizeTransaction(tx: StreamedTransaction): {
     type: TransactionNotification['type']
     amount?: string
     asset?: string
@@ -277,7 +301,7 @@ class TransactionNotificationStore {
    * Handle new transaction from stream
    */
   private handleNewTransaction(
-    tx: any,
+    tx: StreamedTransaction,
     accountId: string,
     network: 'mainnet' | 'testnet',
   ): void {
@@ -286,7 +310,7 @@ class TransactionNotificationStore {
     this.addNotification({
       accountId,
       transaction: tx,
-      timestamp: new Date(tx.created_at).getTime(),
+      timestamp: tx.created_at ? new Date(tx.created_at).getTime() : Date.now(),
       type: categoryInfo.type,
       amount: categoryInfo.amount,
       asset: categoryInfo.asset,
@@ -303,7 +327,10 @@ class TransactionNotificationStore {
    */
   private playNotificationSound(): void {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const WebkitAudioContext = (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      const AudioCtor = window.AudioContext ?? WebkitAudioContext
+      if (!AudioCtor) return
+      const audioContext = new AudioCtor()
       const oscillator = audioContext.createOscillator()
       const gain = audioContext.createGain()
 

@@ -9,7 +9,7 @@
  * invalidation, and offline awareness.
  */
 
-import { Cache, TTL, isOffline } from './cache.js';
+import { Cache, TTL, isOffline } from './cache';
 import {
   getCachedApiResponse,
   setCachedApiResponse,
@@ -17,7 +17,7 @@ import {
   invalidateCacheByTag,
   pruneExpiredApiCache,
   storageStats as idbStorageStats,
-} from './storage.js';
+} from './storage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

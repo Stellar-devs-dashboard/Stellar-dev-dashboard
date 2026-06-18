@@ -6,7 +6,7 @@ import DashboardGrid from '../layout/DashboardGrid';
 import WidgetSelector from '../layout/WidgetSelector';
 import { useResponsive } from '../../hooks/useResponsive';
 import { addBreadcrumb } from '../../lib/errorReporting';
-import { getDashboardLayout, saveDashboardLayout } from '../../lib/userPreferences';
+import { getDashboardLayout, saveDashboardLayout, type WidgetLayout } from '../../lib/userPreferences';
 import BalanceWidget from '../layout/widgets/BalanceWidget';
 import AssetsWidget from '../layout/widgets/AssetsWidget';
 import TransactionsWidget from '../layout/widgets/TransactionsWidget';
@@ -15,8 +15,14 @@ import AccountStatsWidget from '../layout/widgets/AccountStatsWidget';
 import QuickActionsWidget from '../layout/widgets/QuickActionsWidget';
 import PriceTickerWidget from '../layout/widgets/PriceTickerWidget';
 import type { WidgetConfig } from './types';
+import type { WidgetInstance } from '../layout/WidgetSelector';
 
-interface WidgetItem extends WidgetConfig {
+interface WidgetItem {
+  id: string
+  type: string
+  height: number
+  span: number
+  order?: number
   component: ReactNode
 }
 
@@ -52,11 +58,26 @@ export default function Overview() {
   useEffect(() => {
     async function hydrateDashboardLayout() {
       try {
-        const savedLayout = await getDashboardLayout();
-        const activeLayoutRules = (savedLayout && savedLayout.length > 0) ? savedLayout : DEFAULT_WIDGETS;
+        const saved = await getDashboardLayout();
+        let activeLayoutRules: WidgetLayout[];
+        if (saved && saved.length > 0) {
+          activeLayoutRules = saved;
+        } else {
+          activeLayoutRules = DEFAULT_WIDGETS.map((widget, index): WidgetLayout => ({
+            id: widget.id,
+            type: widget.type,
+            height: widget.height,
+            span: widget.span,
+            order: index,
+          }));
+        }
 
-        const hydratedWidgets: WidgetItem[] = activeLayoutRules.map((widget: WidgetConfig) => ({
-          ...widget,
+        const hydratedWidgets: WidgetItem[] = activeLayoutRules.map((widget: WidgetLayout) => ({
+          id: widget.id,
+          type: widget.type,
+          height: widget.height ?? 260,
+          span: widget.span,
+          order: widget.order,
           component: React.createElement(getWidgetComponent(widget.type), {
             key: `${widget.id}-${Date.now()}`,
             onRefresh: () => refreshWidgets()
@@ -129,9 +150,12 @@ export default function Overview() {
     addBreadcrumb('Widget removed', 'user_action', { widgetId: widget.id, widgetType: widget.type });
   };
 
-  const handleAddWidget = (newWidget: WidgetConfig) => {
+  const handleAddWidget = (newWidget: WidgetInstance) => {
     const freshWidgetWithElement: WidgetItem = {
-      ...newWidget,
+      id: newWidget.id,
+      type: newWidget.type,
+      height: newWidget.height,
+      span: newWidget.span,
       component: React.createElement(getWidgetComponent(newWidget.type), {
         key: `${newWidget.id}-${Date.now()}`,
         onRefresh: () => refreshWidgets()
@@ -330,7 +354,14 @@ export default function Overview() {
         isOpen={showWidgetSelector}
         onClose={() => setShowWidgetSelector(false)}
         onAddWidget={handleAddWidget}
-        existingWidgets={widgets}
+        existingWidgets={widgets.map((w) => ({
+          id: w.id,
+          type: w.type,
+          component: w.component,
+          width: 300,
+          height: w.height,
+          span: w.span,
+        }))}
       />
     </div>
   );

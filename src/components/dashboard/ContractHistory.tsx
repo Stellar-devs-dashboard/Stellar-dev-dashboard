@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { getContractInteractions, clearContractInteractions } from "../../lib/storage";
 
-function textInputStyle() {
+function textInputStyle(): CSSProperties {
   return {
     background: "var(--bg-elevated)",
     border: "1px solid var(--border-bright)",
@@ -15,7 +15,7 @@ function textInputStyle() {
   };
 }
 
-function ActionButton({ label, onClick, disabled, tone = "primary" }) {
+function ActionButton({ label, onClick, disabled = false, tone = "primary" }) {
   const palette =
     tone === "secondary"
       ? {

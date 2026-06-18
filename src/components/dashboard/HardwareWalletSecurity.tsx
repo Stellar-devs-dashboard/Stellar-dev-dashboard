@@ -292,7 +292,7 @@ const DeviceCard: React.FC<{
 const SecurityItem: React.FC<{
   label: string;
   status: string;
-  icon: React.ComponentType<{ size: number; style?: React.CSSProperties }>;
+  icon: import('../../types/components').IconComponent;
 }> = ({ label, icon: Icon, status }) => {
   const isGood = status === 'enabled' || status === 'up-to-date' || status === 'none';
   

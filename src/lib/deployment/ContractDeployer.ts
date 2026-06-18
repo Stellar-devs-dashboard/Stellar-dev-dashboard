@@ -9,12 +9,6 @@ export interface ConstructorArgInput {
   value: string;
 }
 
-export interface DeploymentCost {
-  estimatedFeeStroops: number;
-  footprintKb: number;
-  argCount: number;
-}
-
 export interface DeploymentTimelineEntry {
   id: string;
   label: string;
@@ -126,7 +120,7 @@ export class ContractDeployer {
   async estimateDeploymentCost(
     wasmBytes: Uint8Array,
     constructorArgs: ConstructorArgInput[]
-  ): Promise<DeploymentCost> {
+  ): Promise<CostEstimate> {
     return CostEstimator.estimate(wasmBytes, constructorArgs);
   }
 

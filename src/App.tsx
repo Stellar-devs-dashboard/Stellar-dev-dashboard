@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { I18nProvider } from './components/I18nProvider'
-import './i18n/index.js'
+import './i18n/index'
 import './styles/responsive.css';
 import './styles/mobile-performance.css';
 import { AccessibilityProvider } from './context/AccessibilityContext';

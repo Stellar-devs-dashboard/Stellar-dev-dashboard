@@ -7,6 +7,10 @@ import {
   isValidContractId,
   NETWORKS,
   simulateContractCall,
+  type BuildContractInvocationParams,
+  type ContractInvocationArg,
+  type ContractSimulationResult,
+  type ContractSubmitResult,
 } from '../../lib/stellar'
 import {
   buildContractWorkspace,
@@ -16,16 +20,52 @@ import {
   initDebugSession,
 } from '../../lib/contractDevelopment'
 import TemplateLibrary from '../templates/TemplateLibrary'
-import ContractDebugger from './ContractDebugger.jsx'
+import ContractDebugger from './ContractDebugger'
 
-const ARGUMENT_TYPES = [
+const ARGUMENT_TYPES: { value: ContractInvocationArg['type']; label: string }[] = [
   { value: 'string', label: 'String' },
   { value: 'int', label: 'Int' },
   { value: 'address', label: 'Address' },
   { value: 'bool', label: 'Bool' },
 ]
 
-function Panel({ title, subtitle, children }) {
+interface InvokeFormArg {
+  type: ContractInvocationArg['type'];
+  value: string;
+}
+
+interface InvokeFormState {
+  contractId: string;
+  functionName: string;
+  sourceAccount: string;
+  secretKey: string;
+  args: InvokeFormArg[];
+}
+
+interface PanelProps {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}
+
+interface LabeledFieldProps {
+  label: string;
+  children: React.ReactNode;
+}
+
+interface ActionButtonProps {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: 'primary' | 'secondary';
+}
+
+interface ResultBlockProps {
+  label: string;
+  data: unknown;
+}
+
+function Panel({ title, subtitle, children }: PanelProps) {
   return (
     <div style={{
       background: 'var(--bg-card)',
@@ -48,7 +88,7 @@ function Panel({ title, subtitle, children }) {
   )
 }
 
-function LabeledField({ label, children }) {
+function LabeledField({ label, children }: LabeledFieldProps) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -59,7 +99,7 @@ function LabeledField({ label, children }) {
   )
 }
 
-function textInputStyle(hasError = false) {
+function textInputStyle(hasError = false): React.CSSProperties {
   return {
     width: '100%',
     background: 'var(--bg-elevated)',
@@ -75,7 +115,7 @@ function textInputStyle(hasError = false) {
   }
 }
 
-function ActionButton({ label, onClick, disabled, tone = 'primary' }) {
+function ActionButton({ label, onClick, disabled = false, tone = 'primary' }: ActionButtonProps) {
   const palette = tone === 'secondary'
     ? {
         background: 'var(--bg-elevated)',
@@ -110,7 +150,7 @@ function ActionButton({ label, onClick, disabled, tone = 'primary' }) {
   )
 }
 
-function ResultBlock({ label, data }) {
+function ResultBlock({ label, data }: ResultBlockProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -152,7 +192,7 @@ export default function Contracts() {
   } = useStore()
 
   const [inspectInput, setInspectInput] = useState(contractId || '')
-  const [invokeForm, setInvokeForm] = useState({
+  const [invokeForm, setInvokeForm] = useState<InvokeFormState>({
     contractId: contractId || '',
     functionName: '',
     sourceAccount: connectedAddress || '',
@@ -162,34 +202,36 @@ export default function Contracts() {
   const [simulateLoading, setSimulateLoading] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [invokeError, setInvokeError] = useState('')
-  const [simulationResult, setSimulationResult] = useState(null)
-  const [submitResult, setSubmitResult] = useState(null)
+  const [simulationResult, setSimulationResult] = useState<ContractSimulationResult | null>(null)
+  const [submitResult, setSubmitResult] = useState<ContractSubmitResult | null>(null)
   const [templateId, setTemplateId] = useState('token')
   const [workspace, setWorkspace] = useState(() => buildContractWorkspace('token'))
   const [sourceEditor, setSourceEditor] = useState(() => buildContractWorkspace('token').source)
   const [testEditor, setTestEditor] = useState(() => buildContractWorkspace('token').tests)
-  const [devResult, setDevResult] = useState(null)
-  const [deployPlan, setDeployPlan] = useState(null)
-  const [debugSession, setDebugSession] = useState(null)
+  const [devResult, setDevResult] = useState<ReturnType<typeof simulateSorobanTests> | null>(null)
+  const [deployPlan, setDeployPlan] = useState<ReturnType<typeof generateDeploymentPlan> | null>(null)
+  const [debugSession, setDebugSession] = useState<ReturnType<typeof initDebugSession> | null>(null)
 
   const isMainnet = network === 'mainnet'
   const inspectInputError = inspectInput.trim() !== '' && !isValidContractId(inspectInput.trim())
   const invokeContractError = invokeForm.contractId.trim() !== '' && !isValidContractId(invokeForm.contractId.trim())
 
-  const invocationPreview = useMemo(() => ({
+  const invocationPreview = useMemo((): BuildContractInvocationParams => ({
     contractId: invokeForm.contractId.trim(),
     functionName: invokeForm.functionName.trim(),
     sourceAccount: invokeForm.sourceAccount.trim() || connectedAddress || '',
-    args: invokeForm.args.filter(arg => arg.value.trim() !== ''),
+    args: invokeForm.args
+      .filter((arg): arg is InvokeFormArg => arg.value.trim() !== '')
+      .map((arg) => ({ type: arg.type, value: arg.value.trim() })),
     network,
   }), [connectedAddress, invokeForm, network])
   const contractTemplates = useMemo(() => getContractTemplates(), [])
 
-  function updateField(field, value) {
+  function updateField<K extends keyof Omit<InvokeFormState, 'args'>>(field: K, value: InvokeFormState[K]) {
     setInvokeForm((current) => ({ ...current, [field]: value }))
   }
 
-  function updateArgument(index, field, value) {
+  function updateArgument(index: number, field: keyof InvokeFormArg, value: string) {
     setInvokeForm((current) => ({
       ...current,
       args: current.args.map((arg, argIndex) => (
@@ -205,14 +247,14 @@ export default function Contracts() {
     }))
   }
 
-  function removeArgument(index) {
+  function removeArgument(index: number) {
     setInvokeForm((current) => ({
       ...current,
       args: current.args.filter((_, argIndex) => argIndex !== index),
     }))
   }
 
-  function handleLoadTemplate(nextTemplateId) {
+  function handleLoadTemplate(nextTemplateId: string) {
     try {
       const nextWorkspace = buildContractWorkspace(nextTemplateId, {
         contractName: nextTemplateId === 'token' ? 'TokenContract' : undefined,
@@ -224,7 +266,7 @@ export default function Contracts() {
       setDevResult(null)
       setDeployPlan(null)
     } catch (error) {
-      setInvokeError(error.message || 'Failed to load template')
+      setInvokeError(error instanceof Error ? error.message : 'Failed to load template')
     }
   }
 
@@ -273,7 +315,7 @@ export default function Contracts() {
       setContractData(result)
       setInvokeForm((current) => ({ ...current, contractId: id }))
     } catch (error) {
-      setContractError(error.message || 'Failed to fetch contract')
+      setContractError(error instanceof Error ? error.message : 'Failed to fetch contract')
     } finally {
       setContractLoading(false)
     }
@@ -289,7 +331,7 @@ export default function Contracts() {
       const result = await simulateContractCall(invocationPreview)
       setSimulationResult(result)
     } catch (error) {
-      setInvokeError(error.message || 'Simulation failed')
+      setInvokeError(error instanceof Error ? error.message : 'Simulation failed')
     } finally {
       setSimulateLoading(false)
     }
@@ -310,7 +352,7 @@ export default function Contracts() {
       })
       setSubmitResult(result)
     } catch (error) {
-      setInvokeError(error.message || 'Submission failed')
+      setInvokeError(error instanceof Error ? error.message : 'Submission failed')
     } finally {
       setSubmitLoading(false)
     }
@@ -484,7 +526,7 @@ export default function Contracts() {
             <div key={index} style={{ display: 'grid', gridTemplateColumns: '140px 1fr auto', gap: '10px', alignItems: 'center' }}>
               <select
                 value={arg.type}
-                onChange={(event) => updateArgument(index, 'type', event.target.value)}
+                onChange={(event) => updateArgument(index, 'type', event.target.value as ContractInvocationArg['type'])}
                 style={textInputStyle()}
               >
                 {ARGUMENT_TYPES.map((option) => (

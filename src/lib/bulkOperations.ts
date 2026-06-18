@@ -1,6 +1,6 @@
 
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { getServer, NETWORKS, isValidPublicKey } from "./stellar";
+import { getServer, NETWORKS, isValidPublicKey, type NetworkName } from "./stellar";
 import { createOperation, buildTransaction, signAndSubmitTransaction } from "./transactionBuilder";
 
 export interface BulkOperationStatus {
@@ -23,7 +23,7 @@ export interface BulkPaymentConfig {
     assetIssuer?: string;
   }>;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (status: BulkOperationStatus[]) => void;
 }
@@ -36,7 +36,7 @@ export interface BulkTrustlineConfig {
     limit?: string;
   }>;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (status: BulkOperationStatus[]) => void;
 }
@@ -44,7 +44,7 @@ export interface BulkTrustlineConfig {
 export interface RollbackConfig {
   sourceAccount: string;
   secretKey: string;
-  network?: string;
+  network?: NetworkName;
   concurrency?: number;
   onProgress?: (statuses: BulkOperationStatus[]) => void;
 }
