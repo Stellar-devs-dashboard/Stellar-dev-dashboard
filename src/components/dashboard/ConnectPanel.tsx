@@ -1,4 +1,4 @@
-import React, { useState, type CSSProperties, type KeyboardEvent } from 'react'
+import React, { useState, useRef, type CSSProperties, type KeyboardEvent } from 'react'
 import { announceToScreenReader } from '../../utils/accessibility'
 import { useStore } from '../../lib/store'
 import {
@@ -36,6 +36,7 @@ export default function ConnectPanel() {
   const [error, setError] = useState<string>('')
   const [addressInfo, setAddressInfo] = useState<AddressInfo | null>(null)
   const { isMobile, isTablet } = useResponsive()
+  const abortRef = useRef<AbortController | null>(null)
   const {
     network,
     setConnectedAddress,
@@ -59,13 +60,21 @@ export default function ConnectPanel() {
       setAddressInfo(null)
       return
     }
+
+    // Cancel any in-flight connect so its callbacks never write stale state
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const { signal } = controller
+
     setError('')
     setAccountLoading(true)
-    
+
     try {
       // Resolve the address (handles G, M, and federated formats)
       const resolved = await resolveAddress(addr, network)
-      
+      if (signal.aborted) return
+
       if (!resolved) {
         setError('Failed to resolve address')
         setAddressInfo(null)
@@ -89,6 +98,7 @@ export default function ConnectPanel() {
         const cached = await stellarCacheManager.getWithFallback(
           `account:${resolved.accountId}:${network}`,
         )
+        if (signal.aborted) return
         if (cached.value) {
           account = cached.value
         } else {
@@ -98,7 +108,8 @@ export default function ConnectPanel() {
           return
         }
       } else {
-        account = await fetchAccount(resolved.accountId, network)
+        account = await fetchAccount(resolved.accountId, network, signal)
+        if (signal.aborted) return
       }
 
       setConnectedAddress(resolved.accountId)
@@ -117,41 +128,46 @@ export default function ConnectPanel() {
 
       setTxLoading(true)
       setOpsLoading(true)
-      
-      fetchTransactions(resolved.accountId, network, 50)
+
+      fetchTransactions(resolved.accountId, network, 50, null, signal)
         .then(({ records, nextCursor, hasMore }) => {
+          if (signal.aborted) return
           setTransactions(records)
           setTxNextCursor(nextCursor)
           setTxHasMore(hasMore)
         })
         .catch(() => {
+          if (signal.aborted) return
           setTransactions([])
           setTxNextCursor(null)
           setTxHasMore(false)
         })
         .finally(() => {
-          setTxLoading(false)
+          if (!signal.aborted) setTxLoading(false)
         })
 
-      fetchOperations(resolved.accountId, network, 50)
+      fetchOperations(resolved.accountId, network, 50, null, signal)
         .then(({ records, nextCursor, hasMore }) => {
+          if (signal.aborted) return
           setOperations(records)
           setOpsNextCursor(nextCursor)
           setOpsHasMore(hasMore)
         })
         .catch(() => {
+          if (signal.aborted) return
           setOperations([])
           setOpsNextCursor(null)
           setOpsHasMore(false)
         })
         .finally(() => {
-          setOpsLoading(false)
+          if (!signal.aborted) setOpsLoading(false)
         })
     } catch (err) {
+      if (signal.aborted) return
       setError((err as Error)?.message || 'Account not found on ' + network)
       setAddressInfo(null)
     } finally {
-      setAccountLoading(false)
+      if (!signal.aborted) setAccountLoading(false)
     }
   }
 

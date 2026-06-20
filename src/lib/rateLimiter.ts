@@ -304,11 +304,17 @@ class RateLimiter {
       queuedRequest.resolve?.(response);
       
     } catch (error) {
-      // Retry logic
+      // Aborted requests must not be retried — surface the AbortError immediately
+      if ((error as Error)?.name === 'AbortError') {
+        queuedRequest.reject?.(error);
+        this.statistics.rejectedRequests++;
+        return;
+      }
+      // Retry logic for non-abort errors
       if (queuedRequest.retryCount < queuedRequest.maxRetries) {
         queuedRequest.retryCount++;
         queuedRequest.timestamp = Date.now();
-        
+
         // Add back to queue with lower priority
         const retryPriority: RequestPriority = queuedRequest.priority === 'high' ? 'medium' : 'low';
         this.priorityQueues[retryPriority].push(queuedRequest);

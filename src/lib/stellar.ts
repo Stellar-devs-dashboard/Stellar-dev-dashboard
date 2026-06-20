@@ -489,7 +489,8 @@ export async function probeAllNetworks(): Promise<NetworkProbeResult[]> {
 
 export async function fetchAccount(
   publicKey: string,
-  network: NetworkName = 'testnet'
+  network: NetworkName = 'testnet',
+  signal?: AbortSignal
 ): Promise<StellarSdk.Horizon.AccountResponse> {
   const cacheKey = `account:${publicKey}:${network}`;
   const cached = stellarCache.get<StellarSdk.Horizon.AccountResponse>(cacheKey);
@@ -497,7 +498,7 @@ export async function fetchAccount(
 
   const breaker = getCircuitBreaker(`horizon:${network}`, { failureThreshold: 5, timeout: 30_000 });
   const server = getServer(network);
-  const account = await breaker.execute(() => server.loadAccount(publicKey));
+  const account = await breaker.execute(() => server.loadAccount(publicKey), signal);
   stellarCache.set(cacheKey, account, TTL.ACCOUNT, ['account', publicKey]);
   return account;
 }
@@ -508,7 +509,8 @@ export async function fetchTransactions(
   publicKey: string,
   network: NetworkName = 'testnet',
   limit = 20,
-  cursor: string | null = null
+  cursor: string | null = null,
+  signal?: AbortSignal
 ): Promise<{
   records: StellarSdk.Horizon.ServerApi.TransactionRecord[];
   nextCursor: string | null;
@@ -522,12 +524,17 @@ export async function fetchTransactions(
   }>(cacheKey);
   if (cached) return cached;
 
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
   const server = getServer(network);
   const request = server.transactions().forAccount(publicKey).order('desc').limit(limit);
 
   if (cursor) request.cursor(cursor);
 
   const txs = await request.call();
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
   const records = txs.records || [];
   const nextCursor = records.length > 0 ? records[records.length - 1].paging_token : null;
 
@@ -544,7 +551,8 @@ export async function fetchOperations(
   publicKey: string,
   network: NetworkName = 'testnet',
   limit = 20,
-  cursor: string | null = null
+  cursor: string | null = null,
+  signal?: AbortSignal
 ): Promise<{
   records: StellarSdk.Horizon.ServerApi.OperationRecord[];
   nextCursor: string | null;
@@ -558,12 +566,17 @@ export async function fetchOperations(
   }>(cacheKey);
   if (cached) return cached;
 
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
   const server = getServer(network);
   const request = server.operations().forAccount(publicKey).order('desc').limit(limit);
 
   if (cursor) request.cursor(cursor);
 
   const ops = await request.call();
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
   const records = ops.records || [];
   const nextCursor = records.length > 0 ? records[records.length - 1].paging_token : null;
 
