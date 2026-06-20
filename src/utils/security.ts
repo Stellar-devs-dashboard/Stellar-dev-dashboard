@@ -26,18 +26,30 @@ export function generateCspNonce(): string {
 
 export function buildCspHeader(nonce?: string): string {
   const nonceAttr = nonce ? ` 'nonce-${nonce}'` : '';
+  const connectSrc = [
+    `'self'`,
+    `https://horizon.stellar.org`,
+    `https://horizon-testnet.stellar.org`,
+    `https://horizon-futurenet.stellar.org`,
+    `https://soroban-rpc.stellar.org`,
+    `https://soroban-testnet.stellar.org`,
+    `https://soroban-futurenet.stellar.org`,
+    `https://api.coingecko.com`,
+    `https://friendbot.stellar.org`,
+    `https://friendbot-futurenet.stellar.org`,
+  ];
   return [
     `default-src 'self'`,
-    `script-src 'self'${nonceAttr}`,
-    `style-src 'self'${nonceAttr}`,
-    `img-src 'self' data: https:`,
-    `connect-src 'self' https://*.stellar.org https://api.coingecko.com`,
-    `font-src 'self'`,
+    `script-src 'self' 'wasm-unsafe-eval' 'sha256-Q+phTnCmXICynHkH6QGXv2bYyr/Lrrc2IttPhtIHXH4='${nonceAttr}`,
+    `connect-src ${connectSrc.join(' ')}`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+    `font-src 'self' https://fonts.gstatic.com`,
+    `img-src 'self' data:`,
+    `frame-src 'none'`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `frame-ancestors 'none'`,
     `form-action 'self'`,
-    `upgrade-insecure-requests`,
   ].join('; ');
 }
 
