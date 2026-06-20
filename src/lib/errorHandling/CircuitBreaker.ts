@@ -46,7 +46,9 @@ export class CircuitBreaker {
     return this.state === 'OPEN'
   }
 
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
+  async execute<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
     if (this.state === 'OPEN') {
       if (this.shouldAttemptReset()) {
         this.transitionTo('HALF_OPEN')
@@ -57,9 +59,12 @@ export class CircuitBreaker {
 
     try {
       const result = await operation()
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
       this.onSuccess()
       return result
     } catch (error) {
+      // Aborts are not service failures — don't penalise the circuit breaker
+      if ((error as Error)?.name === 'AbortError') throw error
       this.onFailure()
       throw error
     }
