@@ -1215,6 +1215,221 @@ export async function invokeContract(params: InvokeContractParams): Promise<Cont
   };
 }
 
+// ─── Contract Events ──────────────────────────────────────────────────────────
+
+export type ContractEventType = 'contract' | 'system' | 'diagnostic';
+
+/**
+ * Raw event shape as returned by Soroban RPC `getEvents`. Field types vary
+ * across SDK versions (the SDK may hand back parsed `xdr.ScVal` objects, plain
+ * base64 XDR strings, or `{ xdr }` wrappers), so this keeps everything loose and
+ * the decoder normalises it.
+ */
+export interface RawContractEvent {
+  id?: string;
+  type?: string | { name?: string };
+  ledger?: number | string;
+  ledgerClosedAt?: string;
+  contractId?: string | { toString(): string };
+  pagingToken?: string;
+  inSuccessfulContractCall?: boolean;
+  txHash?: string;
+  transactionHash?: string;
+  topic?: unknown[];
+  topics?: unknown[];
+  value?: unknown;
+}
+
+export interface DecodedContractEvent {
+  id: string;
+  type: ContractEventType | string;
+  ledger: number;
+  ledgerClosedAt: string | null;
+  contractId: string | null;
+  txHash: string | null;
+  pagingToken: string | null;
+  inSuccessfulContractCall: boolean;
+  topics: unknown[];
+  value: unknown;
+}
+
+const DEFAULT_EVENT_LEDGER_LOOKBACK = 10_000;
+
+function isScVal(input: unknown): input is StellarSdk.xdr.ScVal {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    typeof (input as { toXDR?: unknown }).toXDR === 'function' &&
+    typeof (input as { switch?: unknown }).switch === 'function'
+  );
+}
+
+/**
+ * Decode a single event topic/value into a native JS value. Accepts a parsed
+ * `xdr.ScVal`, a base64 XDR string, or a `{ xdr }` wrapper, and falls back to the
+ * raw representation when the payload cannot be decoded.
+ */
+export function decodeEventScVal(input: unknown): unknown {
+  if (input === null || input === undefined) return null;
+
+  let scVal: StellarSdk.xdr.ScVal | null = null;
+  try {
+    if (isScVal(input)) {
+      scVal = input;
+    } else if (typeof input === 'string') {
+      scVal = StellarSdk.xdr.ScVal.fromXDR(input, 'base64');
+    } else if (typeof (input as { xdr?: unknown }).xdr === 'string') {
+      scVal = StellarSdk.xdr.ScVal.fromXDR((input as { xdr: string }).xdr, 'base64');
+    } else {
+      return input;
+    }
+    return StellarSdk.scValToNative(scVal);
+  } catch {
+    // Preserve the raw payload so the UI can still surface something useful.
+    if (typeof input === 'string') return input;
+    if (typeof (input as { xdr?: unknown }).xdr === 'string') return (input as { xdr: string }).xdr;
+    try {
+      return scVal ? scVal.toXDR('base64') : input;
+    } catch {
+      return input;
+    }
+  }
+}
+
+function normalizeEventType(type: RawContractEvent['type']): string {
+  if (typeof type === 'string') return type;
+  if (type && typeof type === 'object' && typeof type.name === 'string') return type.name;
+  return 'contract';
+}
+
+function normalizeContractId(contractId: RawContractEvent['contractId']): string | null {
+  if (!contractId) return null;
+  if (typeof contractId === 'string') return contractId;
+  try {
+    return contractId.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert a raw Soroban RPC event into a fully decoded, render-friendly record.
+ * Topics and the value are decoded from XDR to native JS via `scValToNative`.
+ */
+export function decodeContractEvent(raw: RawContractEvent): DecodedContractEvent {
+  const topicSource = Array.isArray(raw.topic)
+    ? raw.topic
+    : Array.isArray(raw.topics)
+    ? raw.topics
+    : [];
+
+  const pagingToken = raw.pagingToken ?? raw.id ?? null;
+
+  return {
+    id: raw.id ?? raw.pagingToken ?? '',
+    type: normalizeEventType(raw.type),
+    ledger: Number(raw.ledger ?? 0),
+    ledgerClosedAt: raw.ledgerClosedAt ?? null,
+    contractId: normalizeContractId(raw.contractId),
+    txHash: raw.txHash ?? raw.transactionHash ?? null,
+    pagingToken,
+    inSuccessfulContractCall: raw.inSuccessfulContractCall ?? true,
+    topics: topicSource.map(decodeEventScVal),
+    value: decodeEventScVal(raw.value),
+  };
+}
+
+export interface FetchContractEventsParams {
+  contractId: string;
+  network?: NetworkName;
+  /** Explicit ledger to start scanning from. Ignored when `cursor` is provided. */
+  startLedger?: number;
+  /** Forward paging cursor; takes precedence over `startLedger`. */
+  cursor?: string | null;
+  /** Server-side event type filter. `all` omits the type filter. */
+  eventType?: ContractEventType | 'all';
+  /** Raw topic XDR matchers (advanced); most callers filter topics client-side. */
+  topics?: string[][];
+  limit?: number;
+}
+
+export interface ContractEventsResult {
+  events: DecodedContractEvent[];
+  latestLedger: number;
+  /** Forward cursor for the next page / next poll, or null when unavailable. */
+  cursor: string | null;
+}
+
+/**
+ * Fetch contract events from Soroban RPC `getEvents`, decoding every topic and
+ * value to native JS. Returns a forward cursor that can be passed back in to
+ * page forward or to poll for newly emitted events.
+ */
+export async function fetchContractEvents(
+  params: FetchContractEventsParams
+): Promise<ContractEventsResult> {
+  const {
+    contractId,
+    network = 'testnet',
+    startLedger,
+    cursor,
+    eventType = 'all',
+    topics,
+    limit = 100,
+  } = params;
+
+  if (!isValidContractId(contractId)) {
+    throw new Error('Invalid contract address');
+  }
+
+  const server = getSorobanServer(network);
+
+  const filter: {
+    type?: ContractEventType;
+    contractIds: string[];
+    topics?: string[][];
+  } = { contractIds: [contractId] };
+  if (eventType && eventType !== 'all') filter.type = eventType;
+  if (topics && topics.length) filter.topics = topics;
+
+  const request: {
+    filters: typeof filter[];
+    limit: number;
+    cursor?: string;
+    startLedger?: number;
+  } = { filters: [filter], limit };
+
+  // `getEvents` accepts either a cursor (forward paging / polling) or a
+  // startLedger, but not both. Prefer the cursor when we have one.
+  if (cursor) {
+    request.cursor = cursor;
+  } else {
+    let start = startLedger;
+    if (start == null) {
+      const latest = await server.getLatestLedger();
+      start = Math.max(1, latest.sequence - DEFAULT_EVENT_LEDGER_LOOKBACK);
+    }
+    request.startLedger = start;
+  }
+
+  const response = (await server.getEvents(
+    request as unknown as Parameters<StellarSdk.SorobanRpc.Server['getEvents']>[0]
+  )) as unknown as {
+    latestLedger: number;
+    events?: RawContractEvent[];
+    cursor?: string;
+  };
+
+  const events = (response.events ?? []).map(decodeContractEvent);
+  const lastPagingToken = events.length ? events[events.length - 1].pagingToken : null;
+
+  return {
+    events,
+    latestLedger: response.latestLedger,
+    cursor: response.cursor ?? lastPagingToken,
+  };
+}
+
 // ─── Validators ───────────────────────────────────────────────────────────────
 
 /**

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { getContractInteractions, clearContractInteractions } from "../../lib/storage";
+import ContractEvents from "./ContractEvents";
 
 function textInputStyle(): CSSProperties {
   return {
@@ -58,6 +59,7 @@ function ActionButton({ label, onClick, disabled = false, tone = "primary" }) {
 }
 
 export default function ContractHistory({ onReplay }) {
+  const [subTab, setSubTab] = useState("interactions"); // "interactions" | "events"
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -139,6 +141,34 @@ export default function ContractHistory({ onReplay }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", gap: "8px" }}>
+        {[
+          { id: "interactions", label: "Interactions" },
+          { id: "events", label: "Events" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setSubTab(tab.id)}
+            style={{
+              padding: "7px 14px",
+              background: subTab === tab.id ? "var(--cyan-glow)" : "transparent",
+              border: `1px solid ${subTab === tab.id ? "var(--cyan-dim)" : "var(--border)"}`,
+              borderRadius: "var(--radius-sm)",
+              color: subTab === tab.id ? "var(--cyan)" : "var(--text-secondary)",
+              fontSize: "12px",
+              fontFamily: "var(--font-mono)",
+              cursor: "pointer",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "events" ? (
+        <ContractEvents />
+      ) : (
+      <>
       <div style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border)",
@@ -298,6 +328,8 @@ export default function ContractHistory({ onReplay }) {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
