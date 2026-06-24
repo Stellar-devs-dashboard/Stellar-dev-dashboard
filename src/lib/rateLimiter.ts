@@ -21,6 +21,7 @@ export interface RateLimiterOptions {
 export interface TokenBucket {
   tokens: number;
   lastRefill: number;
+  windowStart?: number;
   endpointUsage?: Map<string, number>;
 }
 
@@ -99,8 +100,8 @@ class RateLimiter {
   maxQueueSize: number;
   priorityQueues: PriorityQueues;
   cleanupInterval: ReturnType<typeof setInterval>;
-  processingInterval: ReturnType<typeof setInterval>;
   statistics: RateLimiterStatistics;
+  private processingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: RateLimiterOptions = {}) {
     this.windowMs = options.windowMs || 60000; // Default: 1 minute
@@ -117,7 +118,6 @@ class RateLimiter {
       low: []
     };
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
-    this.processingInterval = setInterval(() => this.processQueues(), 50);
     this.statistics = {
       totalRequests: 0,
       queuedRequests: 0,
@@ -153,7 +153,7 @@ class RateLimiter {
     
     // Refill tokens based on time elapsed
     const elapsed = now - bucket.lastRefill;
-    const refillAmount = Math.floor(elapsed / this.windowMs) * this.maxRequests;
+    const refillAmount = (elapsed / this.windowMs) * this.maxRequests;
     
     if (refillAmount > 0) {
       bucket.tokens = Math.min(this.maxRequests, bucket.tokens + refillAmount);
@@ -240,14 +240,30 @@ class RateLimiter {
       this.statistics.queuedRequests++;
       
       // Try to process immediately if possible
-      this.processRequest(queuedRequest);
+      this.processQueues();
     });
+  }
+
+  /**
+   * Schedule queue processing
+   */
+  private scheduleQueueProcessing(): void {
+    if (this.processingTimeout) return;
+    
+    const timePerToken = this.windowMs / this.maxRequests;
+    
+    this.processingTimeout = setTimeout(() => {
+      this.processingTimeout = null;
+      this.processQueues();
+    }, timePerToken);
   }
 
   /**
    * Process queued requests based on rate limits
    */
   processQueues(): void {
+    let anyRemaining = false;
+
     // Process high priority first, then medium, then low
     (['high', 'medium', 'low'] as RequestPriority[]).forEach(priority => {
       const queue = this.priorityQueues[priority];
@@ -256,10 +272,15 @@ class RateLimiter {
         if (this.processRequest(request)) {
           queue.shift(); // Remove from queue if processed
         } else {
+          anyRemaining = true;
           break; // Can't process more requests of this priority
         }
       }
     });
+
+    if (anyRemaining) {
+      this.scheduleQueueProcessing();
+    }
   }
 
   /**
@@ -389,6 +410,7 @@ class RateLimiter {
       bucket = {
         tokens: this.maxRequests - 1,
         lastRefill: now,
+        windowStart: now,
         endpointUsage: new Map()
       };
       this.buckets.set(identifier, bucket);
@@ -397,11 +419,21 @@ class RateLimiter {
     
     // Refill tokens based on time elapsed
     const elapsed = now - bucket.lastRefill;
-    const refillAmount = Math.floor(elapsed / this.windowMs) * this.maxRequests;
+    const refillAmount = (elapsed / this.windowMs) * this.maxRequests;
     
     if (refillAmount > 0) {
       bucket.tokens = Math.min(this.maxRequests, bucket.tokens + refillAmount);
       bucket.lastRefill = now;
+    }
+
+    if (!bucket.windowStart) {
+      bucket.windowStart = now;
+    }
+
+    // Reset endpoint usage on window expiry
+    if (now - bucket.windowStart >= this.windowMs) {
+      bucket.endpointUsage?.clear();
+      bucket.windowStart = now;
     }
     
     // Check endpoint-specific limits
