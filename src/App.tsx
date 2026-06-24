@@ -14,6 +14,8 @@ import './styles/responsive.css';
 import './styles/mobile-performance.css';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 
+
+
 import Sidebar from './components/layout/Sidebar'
 import MobileHeader from './components/layout/MobileHeader'
 import MobileSidebar from './components/layout/MobileSidebar'
