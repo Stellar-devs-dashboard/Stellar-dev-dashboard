@@ -4,10 +4,11 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ComponentType,
   type CSSProperties,
 } from 'react'
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { I18nProvider } from './components/I18nProvider'
 import './i18n/index'
 import './styles/responsive.css';
@@ -16,6 +17,15 @@ import { AccessibilityProvider } from './context/AccessibilityContext';
 
 
 
+import {
+  isValidPublicKey,
+  fetchAccount,
+  fetchTransactions,
+  fetchOperations,
+  resolveAddress,
+} from './lib/stellar'
+import { stellarCacheManager } from './lib/cacheManager'
+import { getOnlineStatus } from './utils/offline'
 import Sidebar from './components/layout/Sidebar'
 import MobileHeader from './components/layout/MobileHeader'
 import MobileSidebar from './components/layout/MobileSidebar'
@@ -25,7 +35,7 @@ import RealTimeNotificationCenter from './components/notifications/RealTimeNotif
 import { useRealTimeNotifications } from './hooks/useRealTimeNotifications'
 import { pruneCaches } from './lib/cacheManager'
 import ErrorBoundary from './components/ErrorBoundary'
-import { useStore } from './lib/store'
+import { useStore, type StoreState } from './lib/store'
 import { useResponsive } from './hooks/useResponsive'
 import { initializeErrorReporting, addBreadcrumb } from './lib/errorReporting'
 import {
@@ -339,6 +349,7 @@ function DashboardLayout() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <NetworkIndicator />
             </div>
+            <CopyLinkButton />
             <button
               onClick={() => setPreferencesOpen(true)}
               title="User Preferences"
@@ -407,13 +418,192 @@ function DashboardLayout() {
   )
 }
 
+// ─── CopyLinkButton ──────────────────────────────────────────────────────────
+function CopyLinkButton() {
+  const { connectedAddress, network, activeTab } = useStore()
+  const [copied, setCopied] = useState(false)
+
+  if (!connectedAddress) return null
+
+  const handleCopy = async () => {
+    const url = new URL(window.location.href)
+    url.pathname = `/${activeTab}`
+    url.searchParams.set('address', connectedAddress)
+    url.searchParams.set('network', network)
+    try {
+      await navigator.clipboard.writeText(url.toString())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback for browsers that block clipboard without https
+      const ta = document.createElement('textarea')
+      ta.value = url.toString()
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <button
+      onClick={() => void handleCopy()}
+      title="Copy shareable link"
+      aria-label="Copy shareable link to clipboard"
+      data-testid="copy-link-button"
+      style={{
+        width: '36px',
+        height: '36px',
+        background: copied ? 'var(--cyan)' : 'var(--bg-elevated)',
+        border: `1px solid ${copied ? 'var(--cyan)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius-md)',
+        color: copied ? 'var(--bg-base)' : 'var(--text-secondary)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '15px',
+        flexShrink: 0,
+        transition: 'var(--transition)',
+      }}
+      onMouseEnter={(e) => {
+        if (!copied) {
+          e.currentTarget.style.color = 'var(--text-primary)'
+          e.currentTarget.style.background = 'var(--bg-hover)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!copied) {
+          e.currentTarget.style.color = 'var(--text-secondary)'
+          e.currentTarget.style.background = 'var(--bg-elevated)'
+        }
+      }}
+    >
+      {copied ? '✓' : '⎘'}
+    </button>
+  )
+}
+
+// ─── RouterSync ───────────────────────────────────────────────────────────────
 function RouterSync() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { connectedAddress, activeTab, setActiveTab } = useStore()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const {
+    connectedAddress,
+    activeTab,
+    network,
+    setActiveTab,
+    setNetwork,
+    setConnectedAddress,
+    setAccountData,
+    setAccountLoading,
+    setAccountError,
+    setTransactions,
+    setTxLoading,
+    setTxNextCursor,
+    setTxHasMore,
+    setOperations,
+    setOpsLoading,
+    setOpsNextCursor,
+    setOpsHasMore,
+  } = useStore()
 
   const pathTab = location.pathname === '/' ? 'overview' : location.pathname.slice(1)
 
+  // ── 1. On initial load, read ?address and ?network from URL ───────────────
+  const didAutoConnect = useRef(false)
+  useEffect(() => {
+    if (didAutoConnect.current) return
+    didAutoConnect.current = true
+
+    const urlAddress = searchParams.get('address')
+    const urlNetwork = searchParams.get('network') as StoreState['network'] | null
+
+    // Set network first so the account fetch uses the right horizon endpoint
+    if (urlNetwork && ['mainnet', 'testnet', 'futurenet', 'local', 'custom'].includes(urlNetwork)) {
+      if (urlNetwork !== network) {
+        setNetwork(urlNetwork)
+      }
+    }
+
+    if (urlAddress && isValidPublicKey(urlAddress) && !connectedAddress) {
+      const targetNetwork = (
+        urlNetwork && ['mainnet', 'testnet', 'futurenet', 'local', 'custom'].includes(urlNetwork)
+          ? urlNetwork
+          : network
+      ) as StoreState['network']
+
+      setAccountLoading(true)
+      const controller = new AbortController()
+      const { signal } = controller
+
+      resolveAddress(urlAddress, targetNetwork)
+        .then(async (resolved) => {
+          if (signal.aborted || !resolved) return
+          let account
+          const online = getOnlineStatus()
+          if (!online) {
+            const cached = await stellarCacheManager.getWithFallback(
+              `account:${resolved.accountId}:${targetNetwork}`,
+            )
+            if (signal.aborted) return
+            if (!cached.value) {
+              setAccountError('You are offline and no cached data is available.')
+              return
+            }
+            account = cached.value
+          } else {
+            account = await fetchAccount(resolved.accountId, targetNetwork, signal)
+          }
+          if (signal.aborted) return
+          setConnectedAddress(resolved.accountId)
+          setAccountData(account as Parameters<typeof setAccountData>[0])
+          // Navigate to the tab that was in the URL path (not always 'overview')
+          if (TABS[pathTab]) {
+            setActiveTab(pathTab)
+          }
+          if (online) {
+            stellarCacheManager
+              .set(`account:${resolved.accountId}:${targetNetwork}`, account, 300_000, ['account'])
+              .catch(() => {})
+
+            const abortFetch = new AbortController()
+            setTxLoading(true)
+            setOpsLoading(true)
+            fetchTransactions(resolved.accountId, targetNetwork, 50, null, abortFetch.signal)
+              .then(({ records, nextCursor, hasMore }) => {
+                setTransactions(records)
+                setTxNextCursor(nextCursor)
+                setTxHasMore(hasMore)
+              })
+              .catch(() => { setTransactions([]); setTxNextCursor(null); setTxHasMore(false) })
+              .finally(() => setTxLoading(false))
+            fetchOperations(resolved.accountId, targetNetwork, 50, null, abortFetch.signal)
+              .then(({ records, nextCursor, hasMore }) => {
+                setOperations(records)
+                setOpsNextCursor(nextCursor)
+                setOpsHasMore(hasMore)
+              })
+              .catch(() => { setOperations([]); setOpsNextCursor(null); setOpsHasMore(false) })
+              .finally(() => setOpsLoading(false))
+          }
+        })
+        .catch((err) => {
+          if (!signal.aborted) setAccountError((err as Error)?.message || 'Account not found')
+        })
+        .finally(() => {
+          if (!signal.aborted) setAccountLoading(false)
+        })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── 2. Path → tab: when browser navigates (back/forward or direct URL), update store ──
   useEffect(() => {
     if (pathTab === 'connect') return
     if (TABS[pathTab] && pathTab !== activeTab) {
@@ -421,13 +611,50 @@ function RouterSync() {
     }
   }, [location.pathname])
 
+  // ── 3. Tab → path: when setActiveTab() is called directly (e.g. ConnectPanel
+  //    sets 'overview' after connecting), push the matching path into history.
+  //    Skip if the path already matches, or if it maps to a different known tab
+  //    (meaning the user navigated via the sidebar — let effect 2 own that).
+  useEffect(() => {
+    if (!connectedAddress) return
+    if (!TABS[activeTab]) return
+    const expectedPath = `/${activeTab}`
+    if (location.pathname !== expectedPath && !TABS[pathTab]) {
+      const params = new URLSearchParams(searchParams)
+      navigate({ pathname: expectedPath, search: params.toString() }, { replace: false })
+    }
+  }, [activeTab])
+
+  // ── 4. Redirect guard: no address → /connect, has address → away from /connect ──
   useEffect(() => {
     if (!connectedAddress && pathTab !== 'connect') {
       navigate('/connect', { replace: true })
     } else if (connectedAddress && pathTab === 'connect') {
-      navigate(`/${activeTab}`, { replace: true })
+      const params = new URLSearchParams(searchParams)
+      navigate({ pathname: `/${activeTab}`, search: params.toString() }, { replace: true })
     }
   }, [connectedAddress, location.pathname])
+
+  // ── 5. Keep ?address and ?network in URL in sync with store state ─────────
+  useEffect(() => {
+    if (!connectedAddress) return
+    const currentAddress = searchParams.get('address')
+    const currentNetwork = searchParams.get('network')
+    if (currentAddress !== connectedAddress || currentNetwork !== network) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('address', connectedAddress)
+          next.set('network', network)
+          return next
+        },
+        { replace: false },
+      )
+    }
+  // searchParams intentionally omitted: we only want this to run when address/network change,
+  // not on every searchParams object reference update (which would cause an infinite loop)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedAddress, network])
 
   return null
 }
@@ -436,12 +663,12 @@ export default function App() {
   return (
     <I18nProvider>
       <AccessibilityProvider>
-      <RouterSync />
-      <Routes>
-        <Route path="/connect" element={<DashboardLayout />} />
-        <Route path="/*" element={<DashboardLayout />} />
-      </Routes>
-    </AccessibilityProvider>
+        <RouterSync />
+        <Routes>
+          <Route path="/connect" element={<DashboardLayout />} />
+          <Route path="/*" element={<DashboardLayout />} />
+        </Routes>
+      </AccessibilityProvider>
     </I18nProvider>
   )
 }
