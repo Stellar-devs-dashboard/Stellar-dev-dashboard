@@ -152,6 +152,7 @@ export class CollaborationSocket {
 // ─── Singleton factory ────────────────────────────────────────────────────────
 
 let _socket: CollaborationSocket | null = null
+let _socketRefCount = 0
 
 export function getCollaborationSocket(url?: string) {
   if (!_socket && url) {
@@ -165,5 +166,42 @@ export function destroyCollaborationSocket() {
   if (_socket) {
     _socket.disconnect()
     _socket = null
+    _socketRefCount = 0
   }
+}
+
+// ─── React hook ──────────────────────────────────────────────────────────────
+// Import useEffect lazily to keep this file usable in non-React contexts.
+// Components should use this hook rather than calling getCollaborationSocket
+// directly so the singleton is destroyed when the last consumer unmounts.
+
+/**
+ * Returns the shared CollaborationSocket for `url`, keeping it alive for the
+ * lifetime of the calling component.  The socket is destroyed only when the
+ * last mounted consumer unmounts.
+ */
+export function useCollaborationSocket(url: string): CollaborationSocket | null {
+  // Dynamic import of useEffect so this module stays importable outside React.
+  // In practice all callers are components, so the import is always available.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useEffect } = require('react') as typeof import('react')
+
+  useEffect(() => {
+    _socketRefCount++
+    if (!_socket) {
+      _socket = new CollaborationSocket(url)
+      _socket.connect()
+    }
+
+    return () => {
+      _socketRefCount--
+      if (_socketRefCount <= 0) {
+        destroyCollaborationSocket()
+      }
+    }
+  // url changes intentionally restart the socket
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url])
+
+  return _socket
 }

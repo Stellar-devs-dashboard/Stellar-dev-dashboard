@@ -2,17 +2,29 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { RateLimiter } from './rateLimiter';
 
 describe('RateLimiter', () => {
+  // Keep a reference to every limiter created in a test so we can destroy it
+  // (clearInterval on the cleanup timer) before restoring fake timers.
+  const limiters: RateLimiter[] = []
+  const make = (opts?: Parameters<typeof RateLimiter['prototype']['constructor']>[0]) => {
+    const l = new RateLimiter(opts)
+    limiters.push(l)
+    return l
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    // Destroy all limiter instances created during the test to clear intervals
+    // before vi.restoreAllMocks() tears down the timer environment.
+    for (const l of limiters.splice(0)) l.destroy();
     vi.restoreAllMocks();
   });
 
   describe('Token bucket algorithm', () => {
     it('should refill tokens continuously based on elapsed time', () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 10 });
+      const limiter = make({ windowMs: 1000, maxRequests: 10 });
       
       // Consume all tokens
       for (let i = 0; i < 10; i++) {
@@ -30,7 +42,7 @@ describe('RateLimiter', () => {
     });
 
     it('should handle burst behavior correctly', () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 10 });
+      const limiter = make({ windowMs: 1000, maxRequests: 10 });
       
       // Burst 10 requests
       for (let i = 0; i < 10; i++) {
@@ -41,7 +53,7 @@ describe('RateLimiter', () => {
     });
 
     it('should handle window rollover and respect max capacity', () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 10 });
+      const limiter = make({ windowMs: 1000, maxRequests: 10 });
       
       // Consume 5 tokens
       for (let i = 0; i < 5; i++) {
@@ -61,7 +73,7 @@ describe('RateLimiter', () => {
 
   describe('Multi-endpoint limits', () => {
     it('should respect specific endpoint limits', () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 30 });
+      const limiter = make({ windowMs: 1000, maxRequests: 30 });
       
       // 'contracts' endpoint has a limit of 5
       for (let i = 0; i < 5; i++) {
@@ -72,7 +84,7 @@ describe('RateLimiter', () => {
     });
 
     it('should reset endpoint usage on window expiry', () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 30 });
+      const limiter = make({ windowMs: 1000, maxRequests: 30 });
       
       // 'contracts' limit is 5
       for (let i = 0; i < 5; i++) {
@@ -90,7 +102,7 @@ describe('RateLimiter', () => {
 
   describe('Queue processing', () => {
     it('should process queue in an event-driven way without polling', async () => {
-      const limiter = new RateLimiter({ windowMs: 1000, maxRequests: 1 });
+      const limiter = make({ windowMs: 1000, maxRequests: 1 });
       
       // Mock fetch
       global.fetch = vi.fn().mockResolvedValue({ ok: true });

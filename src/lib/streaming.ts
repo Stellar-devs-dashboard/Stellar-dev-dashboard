@@ -152,6 +152,13 @@ class StreamManager {
 
 export const ledgerStreamManager = new StreamManager()
 
+/**
+ * Ref-counted subscriber count so the shared ledgerStreamManager is only
+ * disconnected when the *last* subscriber unsubscribes.  Without this, the
+ * first component to unmount would kill the stream for all remaining ones.
+ */
+let _ledgerSubscriberCount = 0
+
 export function connectLedgerStream(
   network: NetworkName,
   onLedger: LedgerCallback,
@@ -160,11 +167,17 @@ export function connectLedgerStream(
   const unsubLedger = ledgerStreamManager.subscribe(onLedger)
   const unsubStatus = ledgerStreamManager.onStatusChange(onStatus)
 
+  _ledgerSubscriberCount++
   ledgerStreamManager.connect(network)
 
   return () => {
     unsubLedger()
     unsubStatus()
-    ledgerStreamManager.disconnect()
+    _ledgerSubscriberCount--
+    // Only tear down the underlying stream when no subscribers remain.
+    if (_ledgerSubscriberCount <= 0) {
+      _ledgerSubscriberCount = 0
+      ledgerStreamManager.disconnect()
+    }
   }
 }
