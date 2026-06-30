@@ -604,6 +604,31 @@ class RateLimiter {
   getThrottleMode(): ThrottleMode {
     return this.throttleMode;
   }
+
+  /**
+   * Release all resources held by this instance.
+   * Call this in test teardown or when the instance is no longer needed.
+   */
+  destroy(): void {
+    clearInterval(this.cleanupInterval);
+    if (this.processingTimeout !== null) {
+      clearTimeout(this.processingTimeout);
+      this.processingTimeout = null;
+    }
+    // Reject any queued requests so callers don't hang
+    const queues: QueuedRequest[] = [
+      ...this.priorityQueues.high,
+      ...this.priorityQueues.medium,
+      ...this.priorityQueues.low,
+    ];
+    for (const req of queues) {
+      req.reject?.(new Error('RateLimiter destroyed'));
+    }
+    this.priorityQueues.high.length = 0;
+    this.priorityQueues.medium.length = 0;
+    this.priorityQueues.low.length = 0;
+    this.buckets.clear();
+  }
 }
 
 // Create default rate limiter instance
