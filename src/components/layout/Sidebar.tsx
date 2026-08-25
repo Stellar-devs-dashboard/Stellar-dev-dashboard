@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { type: 'header', label: 'NETWORK' },
   { id: 'network', label: 'Network Info', icon: '◎' },
   { id: 'networkIntelligence', label: 'Intelligence', icon: '◈' },
+  { id: 'networkGraph', label: 'Graph Analysis', icon: '⌗' },
   { id: 'marketSentiment', label: 'Sentiment', icon: '◔' },
   { id: 'docAnalysis', label: 'Doc Analysis', icon: '❖' },
   { id: 'realtime', label: 'Real-Time', icon: '◉' },
