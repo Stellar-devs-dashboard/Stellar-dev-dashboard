@@ -53,6 +53,7 @@ const NAV_ITEMS: NavItem[] = [
 
   { type: 'header', label: 'EXPLORE' },
   { id: 'dex', label: 'DEX', icon: '⇌' },
+  { id: 'tradingEngine', label: 'Market Making', icon: '⚖' },
   { id: 'pathExplorer', label: 'Path Explorer', icon: '⇢' },
   { id: 'explorers', label: 'Explorer Links', icon: '⊞' },
   
