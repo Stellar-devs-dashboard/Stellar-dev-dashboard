@@ -187,3 +187,7 @@ The dashboard includes a transaction and contract resource profiling workspace a
 # Fraud Detection & Prevention
 
 The dashboard includes a layered fraud workspace at `/fraudDetection`: explainable risk scores, threat-intelligence import, investigation queue, prevention workflows, user education, and an optional REST assessment service for wallet providers. See [the architecture and operations guide](docs/fraud-detection.md).
+
+# Treasury Reconciliation & Accounting Exports
+
+The dashboard includes a treasury reconciliation workspace at `/treasuryReconciliation`: deterministic period reconciliation of payments, path payments, trades, fees, claimable balances, sponsorship changes, Soroban token transfers, and account changes into traceable ledger postings, with configurable category rules, cost-basis inputs, discrepancy detection, immutable period snapshots, and versioned CSV/JSON accounting exports. These are operational records, not tax or accounting advice, and are independent of the AI portfolio optimizer. See [the architecture, data model, and export format guide](docs/treasury-reconciliation.md).

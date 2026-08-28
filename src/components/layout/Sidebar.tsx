@@ -70,6 +70,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'behaviorInsights', label: 'Personalization', icon: '◌' },
   { id: 'recommendations', label: 'For You', icon: '✦' },
   { id: 'fraudDetection', label: 'Fraud Detection', icon: '🛡' },
+  { id: 'treasuryReconciliation', label: 'Treasury Reconciliation', icon: '📒' },
   { id: 'systemHealth', label: 'Health', icon: '⚕' },
   { id: 'dataExport', label: 'Export', icon: '⬇' },
   { id: 'translationReview', label: 'Translations', icon: '文' },
