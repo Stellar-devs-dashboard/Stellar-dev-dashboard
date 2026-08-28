@@ -134,7 +134,7 @@ const TABS: Record<string, TabComponent> = {
   networkGraph: lazyTab(() => import('./components/network-graph/NetworkGraphDashboard')),
 }
 
-const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting']
+const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling']
 
 function TabLoadingFallback() {
   return (

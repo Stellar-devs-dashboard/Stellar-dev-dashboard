@@ -180,6 +180,14 @@ The dashboard includes a credibility-weighted Stellar sentiment workspace at `/m
 
 The dashboard includes a Soroban contract testing workspace at `/contractTesting`: paste or upload contract source and get a generated test suite (unit/property-based/fuzz/regression), heuristic static security findings, coverage and mutation-score estimates, a formal-verification report, and a downloadable CI/CD workflow — backed by a deterministic client-side engine plus an optional REST analysis service. This is pattern-based static analysis, not symbolic execution or a theorem prover; see [the methodology, limitations, and deployment guide](docs/contract-testing.md).
 
+# Resource Profiling Lab
+
+The dashboard includes a transaction and contract resource profiling workspace at `/resourceProfiling`: capture typed resource profiles (classic fees, Soroban instructions/memory/read-write bytes, footprint, events, transaction size) from real simulations through the same shared invocation API as the Transaction Simulator, save them as named baselines, compare candidates with deterministic absolute/percentage thresholds and regression classification, visualize resource breakdowns and metric timelines, enforce budgets, and export versioned, redaction-by-default JSON suitable for a CI gate. This is evidence-based profiling and regression detection against your own historical samples — it makes no AI-based fee predictions and does not duplicate the fee-optimization work in issue #36. See [the architecture, methodology, and privacy guide](docs/resource-profiling.md).
+
 # Fraud Detection & Prevention
 
 The dashboard includes a layered fraud workspace at `/fraudDetection`: explainable risk scores, threat-intelligence import, investigation queue, prevention workflows, user education, and an optional REST assessment service for wallet providers. See [the architecture and operations guide](docs/fraud-detection.md).
+
+# Treasury Reconciliation & Accounting Exports
+
+The dashboard includes a treasury reconciliation workspace at `/treasuryReconciliation`: deterministic period reconciliation of payments, path payments, trades, fees, claimable balances, sponsorship changes, Soroban token transfers, and account changes into traceable ledger postings, with configurable category rules, cost-basis inputs, discrepancy detection, immutable period snapshots, and versioned CSV/JSON accounting exports. These are operational records, not tax or accounting advice, and are independent of the AI portfolio optimizer. See [the architecture, data model, and export format guide](docs/treasury-reconciliation.md).

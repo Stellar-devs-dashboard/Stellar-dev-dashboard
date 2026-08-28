@@ -49,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
 
   { type: 'header', label: 'TESTING' },
   { id: 'contractTesting', label: 'Contract Testing', icon: '🧪' },
+  { id: 'resourceProfiling', label: 'Resource Profiling', icon: '📊' },
   { id: 'bridgeMonitor', label: 'Bridge Monitor', icon: '⇄' },
   { id: 'qaSystem', label: 'AI QA System', icon: '⚛' },
 
@@ -70,6 +71,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'behaviorInsights', label: 'Personalization', icon: '◌' },
   { id: 'recommendations', label: 'For You', icon: '✦' },
   { id: 'fraudDetection', label: 'Fraud Detection', icon: '🛡' },
+  { id: 'treasuryReconciliation', label: 'Treasury Reconciliation', icon: '📒' },
   { id: 'systemHealth', label: 'Health', icon: '⚕' },
   { id: 'dataExport', label: 'Export', icon: '⬇' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
