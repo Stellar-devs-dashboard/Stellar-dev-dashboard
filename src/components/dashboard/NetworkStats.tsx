@@ -110,7 +110,7 @@ export default function Network() {
       if (closeStream) closeStream()
       setIsStreaming(false)
     }
-  }, [network, setNetworkStats, setStatsLoading])
+  }, [network])
 
   const ledger = networkStats?.latestLedger
   const fee = networkStats?.feeStats

@@ -12,6 +12,7 @@
  */
 
 import React from 'react'
+import { vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAccount, fetchAccountWithFallback } from '../useAccount'

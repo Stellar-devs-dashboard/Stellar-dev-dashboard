@@ -63,6 +63,7 @@ import { initializeTransactionOutbox } from './lib/transactionOutbox'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { queryClient } from './lib/queryClient'
+import { diagnosticCollector } from './lib/diagnostics'
 
 interface SearchResult {
   type?: string
@@ -116,6 +117,7 @@ const TABS: Record<string, TabComponent> = {
   recommendations: lazyTab(() => import('./components/recommendations/RecommendationDashboard')),
   systemHealth: lazyTab(() => import('./components/dashboard/SystemHealth')),
   networkIntelligence: lazyTab(() => import('./components/network-intelligence/NetworkIntelligenceDashboard')),
+  compatibility: lazyTab(() => import('./components/compatibility/CompatibilityDashboard')),
   marketSentiment: lazyTab(() => import('./components/market-sentiment/MarketSentimentDashboard')),
   docAnalysis: lazyTab(() => import('./components/doc-analysis/DocAnalysisDashboard')),
   performance: lazyTab(() => import('./components/dashboard/PerformanceMonitor')),
@@ -134,7 +136,7 @@ const TABS: Record<string, TabComponent> = {
   treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
 }
 
-const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting']
+const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics']
 
 function TabLoadingFallback() {
   return (
@@ -281,6 +283,11 @@ function DashboardLayout() {
 
   useEffect(() => {
     addBreadcrumb(`Mapsd to ${activeTab} tab`, 'navigation', { activeTab })
+    diagnosticCollector.addBreadcrumb({
+      action: 'dashboard.navigation',
+      feature: activeTab,
+      detail: { destination: activeTab },
+    })
     trackSecurityEvent(SecurityEventType.CONFIG_CHANGED, {
       target: 'activeTab',
       metadata: { activeTab },

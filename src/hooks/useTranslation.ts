@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useTranslation as useI18nextTranslation } from "react-i18next";
 import { useI18nContext } from "../components/I18nProvider";
 import { RTL_LANGUAGES } from "../i18n/index";
+import { createLocaleFormatter } from '../lib/i18n/formatters';
 
 /**
  * useTranslation
@@ -102,12 +103,17 @@ export function useTranslation(ns = "translation") {
 
   /** true if the active language is RTL (#107) */
   const isRTLActive = isRTL || RTL_LANGUAGES.has(currentLanguage);
+  const formatter = createLocaleFormatter(currentLanguage);
 
   return {
     t: safeT,
     tPlural,
     formatNumber,
     formatDate,
+    formatAmount: formatter.amount,
+    formatDuration: formatter.duration,
+    formatList: formatter.list,
+    formatRelativeTime: formatter.relativeTime,
     i18n,
     ready,
     currentLanguage,

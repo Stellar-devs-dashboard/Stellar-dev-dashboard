@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "contracts", label: "Contracts", icon: "◻" },
   { id: "assets", label: "Assets", icon: "💎" },
   { id: "network", label: "Network", icon: "◎" },
+  { id: "compatibility", label: "Compatibility", icon: "✓" },
   { id: "realtime", label: "Real-Time", icon: "◉" },
   { id: "builder", label: "Builder", icon: "⚒" },
   { id: "faucet", label: "Faucet", icon: "⬡" },
@@ -36,6 +37,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "bridgeMonitor", label: "Bridge Monitor", icon: "⇄" },
   { id: "qaSystem", label: "AI QA System", icon: "⚛" },
   { id: "contractTesting", label: "Contract Testing", icon: "🧪" },
+  { id: "bulkOperations", label: "Bulk Operations", icon: "⧉" },
+  { id: "diagnostics", label: "Diagnostics", icon: "◇" },
 ];
 
 /**

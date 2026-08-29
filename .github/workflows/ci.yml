@@ -51,6 +51,9 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      - name: Validate locale catalogs
+        run: npm run validate:i18n
+
   test:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest

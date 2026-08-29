@@ -56,6 +56,8 @@
         "analytics": "Analytik",
         "systemHealth": "Systemzustand",
         "audit": "Audit-Log",
+        "bridgeMonitor": "Brückenmonitor",
+        "qaSystem": "KI-QA-System",
         "compare": "Vergleichen"
     },
     "connect": {
