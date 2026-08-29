@@ -2,81 +2,77 @@
 
 ## Purpose
 
-Reconcile Stellar ledger activity for a connected account into auditable reporting periods, with per-asset opening/closing balances, categorized postings, discrepancy detection, and versioned CSV/JSON accounting exports.
-
-**This produces operational records, not tax or accounting advice.** Every value is derived deterministically from actual ledger activity (Horizon operations, transactions, trades, and effects) plus optional user-entered reference prices — never from a prediction or model. It is intentionally independent of, and does not duplicate, the AI portfolio optimizer (#33): reconciliation never estimates future value or recommends trades, it only explains ledger activity that already happened.
+Turn raw Stellar ledger activity into auditable accounting periods: normalized postings, opening/closing balance reconciliation, discrepancy detection, category rules, cost-basis-driven realized gain/loss, and versioned journal exports. **This is an operational record, not tax or accounting advice** — every figure is deterministic and traceable to either ledger data or a value you provided; nothing is predicted, forecast, or recommended. It does not overlap with the predictive AI Portfolio Optimizer (issue #33) — this feature is retrospective and deterministic by design.
 
 ## Architecture
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Domain types | `src/types/treasury.ts` | Postings, assets, provenance, rules, periods, balances, discrepancies, snapshots, export contracts |
-| Normalization | `src/lib/treasuryReconciliation/normalize.ts` | Raw Horizon operations/transactions/trades/effects → `LedgerPosting[]` |
-| Rules | `src/lib/treasuryReconciliation/rules.ts` | Configurable category/counterparty-label matching |
-| Cost basis | `src/lib/treasuryReconciliation/costBasis.ts` | User-entered reference prices and operational valuation |
-| Reconciliation engine | `src/lib/treasuryReconciliation/reconcile.ts` | Merge sources, compute balances, detect discrepancies |
-| Snapshots | `src/lib/treasuryReconciliation/snapshot.ts` | Immutable, checksummed period snapshots with schema versioning |
-| Export/import | `src/lib/treasuryReconciliation/exportImport.ts` | Versioned CSV/JSON journals, generic ledger mapping, round-trip import |
-| Persistence | `src/lib/treasuryReconciliation/db.ts` | IndexedDB storage for periods, snapshots, rules, cost-basis entries, review state |
-| Client | `src/lib/treasuryReconciliation/client.ts` | Paginated Horizon fetch with cancellation, timeout, and a deterministic offline fallback |
-| Hook | `src/hooks/useTreasuryReconciliation.ts` | Period lifecycle, rule/cost-basis CRUD, review workflow, export triggers |
-| UI | `src/components/treasury/TreasuryReconciliationDashboard.tsx` | Lazy `/treasuryReconciliation` workspace |
+| Domain types | `src/types/treasury.ts` | Postings, periods, discrepancies, rules, cost basis, journal, snapshots |
+| Amount math | `src/lib/treasury/amount.ts` | Stroop-integer decimal arithmetic (no floating-point rounding error) |
+| Normalization | `src/lib/treasury/normalize.ts` | Horizon operation/transaction → account-perspective ledger postings, paging-gap detection |
+| Rules | `src/lib/treasury/rules.ts` | Category-rule matching, counterparty labeling |
+| Reconciliation | `src/lib/treasury/reconciliation.ts` | Balance waterfall, discrepancy detection, unresolved-item queue, period lifecycle |
+| Cost basis | `src/lib/treasury/costBasis.ts` | FIFO realized gain/loss, missing-price handling |
+| Journal export | `src/lib/treasury/journal.ts` | Double-entry mapping, versioned CSV/JSON export with round-trip import validation |
+| Snapshot | `src/lib/treasury/snapshot.ts` | Immutable, content-hashed period snapshots |
+| Persistence | `src/lib/treasury/records.ts` | Dedicated, independently-versioned IndexedDB store |
+| Fetch client | `src/lib/treasury/client.ts` | Paginated, cancellable, bounded Horizon fetch via the app's existing Stellar client |
+| Fixtures | `src/lib/treasury/fixtures.ts` | Deterministic ledger covering the required edge cases |
+| Hook | `src/hooks/useTreasuryReconciliation.ts` | Orchestrates fetch, normalization, rules, periods, cost basis, snapshots |
+| UI | `src/components/treasury/TreasuryReconciliationDashboard.tsx` | Lazy `/treasuryReconciliation` route ("Treasury" in the sidebar) |
 
-Domain logic never imports React or the Stellar SDK client directly beyond `src/lib/stellar.ts`'s typed fetch helpers — every normalization/reconciliation function is a pure, synchronous transformation you can unit test without a network or a browser.
+This mirrors the layering already used by `src/lib/fraudDetection`, `src/lib/networkGraph`, and `src/lib/wasmVerification` (types → algorithms → client/persistence → hook → UI). The fetch client reuses the app's existing `fetchTransactions`/`fetchOperations` Horizon helpers in `src/lib/stellar.ts` rather than duplicating pagination/caching logic, and the persistence layer owns a dedicated IndexedDB database (`stellar-treasury`) rather than a new object store on the shared `stellar-dev-dashboard` database, so this feature's schema changes can never risk a migration bug elsewhere.
 
-## What gets normalized into a posting
+## Normalization model
 
-| Ledger activity | Posting `kind` | Source |
-| --- | --- | --- |
-| `payment` | `payment` | Horizon operation |
-| `path_payment_strict_send` / `_receive` | `path_payment` | Horizon operation |
-| Executed trades (offers filled, DEX or liquidity pool) | `trade` (two legs: sold + bought asset) | Horizon `/trades` |
-| Transaction fee (`fee_charged`) | `fee` | Horizon transaction, attributed to its source account |
-| `create_claimable_balance` / `claim_claimable_balance` | `claimable_balance_create` / `claimable_balance_claim` | Operation + `claimable_balance_claimed` effect (the operation alone doesn't carry the claimed amount) |
-| Sponsorship changes (`begin/end_sponsoring_future_reserves`, `revoke_sponsorship`, sponsorship effects) | `sponsorship` | Operation and/or effect |
-| Soroban token transfers (SAC `transfer`/`mint`/`burn`/`clawback`) | `contract_transfer` | `invoke_host_function`'s `asset_balance_changes` |
-| `create_account`, `account_merge`, `set_options`, `change_trust`, etc. | `account_change` | Horizon operation |
+Every operation is read from the connected account's perspective and turned into zero or more signed `LedgerPosting`s (positive = credit, negative = debit), all in a single asset key: native XLM is `"XLM"`; every other asset is `"CODE:ISSUER"` — the **full** issuer, never truncated, so two assets sharing a code under different issuers (a real and common collision risk on Stellar) are never merged into one balance.
 
-Operations with no traceable balance effect (offers, data entries, sequence bumps) are intentionally not turned into postings.
+- **Payments** and **path payments** map directly from the operation's `amount`/`from`/`to` fields; path payments are classified `trade` (both legs) since they represent a value exchange, not a plain transfer.
+- **Fees** are posted once per transaction from the transaction record's `fee_charged`, attributed to the transaction's source account — **including on a failed transaction**, since Stellar consumes the fee for ledger inclusion regardless of whether the inner operations executed. Failed transactions produce no operation-level posting.
+- Operation types whose executed amount isn't directly observable in the `/operations` feed — `account_merge` (the transferred amount lives in effects, not the operation record), `claim_claimable_balance` on Horizon versions that omit `amount`/`asset`, `manage_buy_offer`/`manage_sell_offer` (fills aren't in the offer-instruction record), and `invoke_host_function` (Soroban token transfers require parsing contract events) — produce a **zero-amount, clearly-labeled informational posting** instead of a fabricated number, and surface in the Unresolved queue for manual resolution. See Known limitations.
 
-### Known limitation: arbitrary contract calls
+## Reconciliation
 
-Only Soroban invocations that Horizon itself resolves into `asset_balance_changes` (Stellar Asset Contract-shaped transfers/mints/burns/clawbacks) become `contract_transfer` postings. An arbitrary custom contract invocation with no such balance-change record is not decoded from raw XDR and will not appear as a posting — this is a deliberate scope boundary, not a bug, since full ABI-free contract decoding is out of scope for this feature. Deposit/withdraw operations against liquidity pools are similarly not yet normalized into postings.
+`buildPeriod` filters postings to a `[startTime, endTime)` window, computes a per-asset balance waterfall (opening + inflow + outflow + fees = closing), and — when you supply actual closing balances — flags discrepancies beyond a 1-stroop tolerance with a signed difference, percentage, and a short list of likely causes (a missing credit typically means a paging gap; an excess computed balance typically means an unmodeled debit like an account-merge transfer). Closing a period and rolling its computed balances forward as the next period's opening balances (`deriveNextOpeningBalances`) is explicit, not automatic, so a discrepancy is never silently carried forward.
 
-## Discrepancy detection
+## Cost basis & realized gain/loss
 
-`detectDiscrepancies` (in `reconcile.ts`) flags, per period:
+Cost basis is **entirely user-supplied** (manual entry or import) — this module never fetches or predicts a price. Realized gain/loss uses FIFO lot matching (the most auditable, least configuration-dependent convention for a first implementation); a disposal that exceeds tracked lots, or that has no cost-basis entry covering its date, is flagged as `costBasisMissing` rather than assumed to have zero cost. LIFO/specific-identification are noted as follow-up work.
 
-- **`paging-gap`** — ingestion hit its per-source page cap before reaching the period start; some early activity may be missing.
-- **`unresolved-contract-transfer`** / needs-review items — postings normalization couldn't fully resolve (e.g. a bare `claim_claimable_balance` operation with no matching effect).
-- **`rounding`** vs. **`unexplained-delta`** — when an independently-known expected closing balance is supplied, a sub-stroop residual is classified as rounding noise (`info`); anything larger is `critical` and blocks closing the period.
-- **`missing-price`** — an asset had activity this period but no cost-basis entry exists for it (XLM is exempt; it's optional to price).
-- **`asset-code-collision`** — the same human-readable asset code (e.g. `USDC`) is used by more than one issuer in the period's activity, a common source of reconciliation mistakes.
+## Journal export
 
-## Periods, snapshots, and immutability
+`toJournalEntries` produces a balanced double-entry row pair per posting (debit/credit account chosen by a configurable `AccountMappingRule` list, `DEFAULT_MAPPING_RULES` ships a reasonable generic chart of accounts). Both CSV and JSON exports are versioned (`schemaVersion: 1`); the JSON export additionally carries a SHA-256 checksum over its entries, and `parseJournalJson` recomputes and compares it on import — a document edited after export fails validation with a clear message rather than being silently accepted. Both formats round-trip: `exportJournalCsv` → `parseJournalCsv` and `exportJournalJson` → `parseJournalJson` are covered by dedicated round-trip tests.
 
-A period is `open` until explicitly closed. Closing a period with any `critical` discrepancy is blocked. Closing builds a `PeriodSnapshot` (`schemaVersion`, postings, balances, discrepancies, review state, and a deterministic FNV-1a `checksum` over its own contents) and persists it to IndexedDB; `db.saveSnapshot` refuses to overwrite an existing snapshot for the same period, and `verifySnapshotIntegrity`/`loadPeriodSnapshot` detect if a snapshot was hand-edited after the fact. The next period's opening balance is read from the prior period's closing balance automatically.
+## Snapshots
 
-## Exports
+`createPeriodSnapshot` produces an `Object.freeze`d, content-hashed record of a period's full state (postings, waterfall, discrepancies) at the moment it's saved. `verifySnapshotIntegrity` recomputes the hash and reports whether the stored/exported snapshot still matches — the same tamper-evidence pattern used by attestations in `src/lib/wasmVerification`.
 
-- **JSON** (`exportPeriodJson`) — the full `TreasuryExportPayload` (`version: 1`, period, postings, balances, discrepancies, review state). Re-importing validates the version against `SUPPORTED_EXPORT_VERSIONS` and every posting's amount before accepting the file.
-- **CSV** (`exportPeriodCsv`) — one row per posting.
-- **Generic accounting ledger** (`exportGenericLedgerCsv`) — postings mapped through a configurable `AccountingMapping` (category → account code/name) into conventional double-entry debit/credit rows against a "Ledger Clearing" counter-account, importable into an external accounting system's own chart of accounts.
+## Threat model & data handling
 
-## Security & privacy
+- No network call this feature makes ever sends a private key, seed phrase, or signing material — it only reads public ledger history for the connected (read-only) address.
+- Category rules, counterparty labels, and cost-basis entries are stored locally (IndexedDB) and never transmitted anywhere.
+- Exported journals contain only what you configured: posting amounts, asset codes, counterparty addresses/labels, and memos already public on the ledger. No screenshots, error messages, or logs from this feature include secret material — there is none to redact, since the feature never touches key material in the first place.
+- A discrepancy or an unresolved item is a data-quality signal for the operator to investigate, not evidence of wrongdoing or itself something to report externally.
 
-- Every posting's `provenance` field records exactly which Horizon record (operation id, transaction hash, trade id, or effect id) it was derived from, so every number in an export or the UI is traceable back to source ledger activity.
-- All persisted state (periods, snapshots, rules, cost-basis entries, review state) lives in the browser's IndexedDB, scoped to the connected account — nothing is sent to a third-party service.
-- No secret keys or signing material are read or required; reconciliation only reads public ledger data for the connected public address.
-- Cost-basis prices are entered manually by the user (or left absent, surfacing a `missing-price` discrepancy) — the dashboard never fetches or infers prices automatically.
+## Known limitations
 
-## Compatibility & migration
+- **Account merges, some `claim_claimable_balance` responses, offer fills, and Soroban contract token transfers do not produce balance-affecting postings.** The `/operations` endpoint doesn't carry the executed amount for these cases; a real implementation of full coverage needs the `/effects` endpoint (for merges/claims) and Soroban event parsing (for contract transfers) — both flagged as follow-up work below rather than approximated with a guess.
+- Realized gain/loss is FIFO only.
+- The generic account mapping ships one reasonable default chart of accounts; per-organization customization beyond editing `DEFAULT_MAPPING_RULES` in code is a documented follow-up (a rules-editor UI for mappings, mirroring the existing category-rules editor).
+- `fetchAccountLedgerActivity` bounds pagination to 25 pages (200 records each = up to 5,000 transactions and 5,000 operations) per fetch; a `truncated` flag surfaces when this bound was hit so the UI can tell the operator more history exists. Very large multi-year histories need incremental/background fetching as follow-up work rather than one blocking call.
 
-- Both the browser storage schema (`db.ts`, its own dedicated `'stellar-dev-dashboard-treasury'` IndexedDB database, currently `DB_VERSION: 1`) and the export file schema (`EXPORT_SCHEMA_VERSION`) are versioned independently. A future breaking change bumps the relevant version and adds a migration step following the same pattern as `src/lib/import.ts`'s `SUPPORTED_VERSIONS` allowlist. This uses its own database rather than sharing `alertRulesDb.ts`'s `'stellar-dev-dashboard'` database: that module's connection never closes on `versionchange`, so a second `indexedDB.open` call against the same name at a higher version would block forever waiting for a close that never happens — a dedicated database avoids that entirely.
-- Opening an export file from a newer schema version than this build supports fails with a clear "Unsupported export version" message rather than silently misreading it.
+## Follow-up work
 
-## Troubleshooting
+1. Effects-endpoint integration to resolve `account_merge` and `claim_claimable_balance` amounts precisely instead of flagging them.
+2. Soroban contract-event parsing for `invoke_host_function` token transfers.
+3. LIFO / specific-identification cost-basis methods alongside FIFO.
+4. A UI editor for `AccountMappingRule`s (currently code-configured via `DEFAULT_MAPPING_RULES`).
+5. Incremental/background history fetching for accounts whose history exceeds the current per-fetch page bound.
 
-- **"Reconciliation data unavailable"** — Horizon was unreachable within the 15s timeout; use Retry. If the network truly can't be reached (e.g. running fully offline), the dashboard automatically falls back to a labeled deterministic demonstration snapshot instead of a blank page.
-- **A period won't close** — check the Unresolved tab for any `critical` discrepancy; these must be resolved (or shown to be explainable) before closing.
-- **An asset shows no valuation** — enter a cost-basis price for it on the Cost Basis tab; valuations are never estimated automatically.
+## Extending
+
+1. To normalize a new operation type, add a `case` in `normalizeOperation` (`normalize.ts`) and cover it in `normalize.test.ts` — prefer a zero-amount informational posting with a clear note over guessing an amount the operation record doesn't carry.
+2. To add a new posting category by default, extend `DEFAULT_CATEGORY_RULES` in `rules.ts`.
+3. To change the default chart of accounts, edit `DEFAULT_MAPPING_RULES` in `journal.ts`; every posting type must have a fallback (category `null`) rule so `findMappingRule` never falls through to `"Unmapped"` for a known type.
+4. To version a schema change, bump `JOURNAL_SCHEMA_VERSION` or `SNAPSHOT_SCHEMA_VERSION` in `types/treasury.ts` and add a version branch in the corresponding parse/verify function — never silently reinterpret an older document under a new shape.

@@ -1,398 +1,190 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { NetworkName } from '../lib/stellar';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { NetworkName } from '../lib/stellar'
+import { fetchAccountLedgerActivity, TreasuryFetchError } from '../lib/treasury/client'
+import { normalizeAccountActivity } from '../lib/treasury/normalize'
+import { applyRules, DEFAULT_CATEGORY_RULES, labelCounterparties } from '../lib/treasury/rules'
+import { buildPeriod, findUnresolvedItems, type BuildPeriodInput } from '../lib/treasury/reconciliation'
+import { computeRealizedGainLoss } from '../lib/treasury/costBasis'
+import { createPeriodSnapshot, verifySnapshotIntegrity } from '../lib/treasury/snapshot'
 import {
-  buildExportPayload,
-  buildPeriodSnapshot,
-  DEFAULT_ACCOUNTING_MAPPING,
-  DEFAULT_CATEGORY_RULES,
-  exportGenericLedgerCsv,
-  exportPeriodCsv,
-  exportPeriodJson,
-  fetchReconciliationPeriod,
-  parseExportPayload,
-  recategorize,
-  TreasuryReconciliationError,
-  treasuryDb,
-  validateCostBasisEntry,
-  validateRule,
-} from '../lib/treasuryReconciliation';
+  loadCategoryRules,
+  loadCostBasisEntries,
+  loadCounterpartyLabels,
+  loadSnapshots,
+  saveCategoryRules,
+  saveCostBasisEntries,
+  saveCounterpartyLabels,
+  saveSnapshot,
+} from '../lib/treasury/records'
+import { buildFixtureCostBasisEntries, buildFixtureLedger, FIXTURE_ACCOUNT } from '../lib/treasury/fixtures'
 import type {
-  AccountingMapping,
   CategoryRule,
   CostBasisEntry,
+  CounterpartyLabel,
+  LedgerPosting,
   PeriodSnapshot,
+  RealizedGainLoss,
   ReconciliationPeriod,
-  ReconciliationResult,
-  ReviewRecord,
-  ReviewStatus,
-} from '../types/treasury';
+} from '../types/treasury'
 
-const PREFS_KEY = 'stellar:treasury-reconciliation:preferences';
-
-export interface TreasuryPreferences {
-  minimumDiscrepancySeverity: 'info' | 'warning' | 'critical';
-  accountingMappingId: string;
+interface LedgerState {
+  loading: boolean
+  error: TreasuryFetchError | null
+  postings: LedgerPosting[]
+  pagingGapDetected: boolean
+  truncated: boolean
+  simulated: boolean
 }
 
-const defaultPreferences: TreasuryPreferences = {
-  minimumDiscrepancySeverity: 'info',
-  accountingMappingId: DEFAULT_ACCOUNTING_MAPPING.id,
-};
-
-function loadPreferences(): TreasuryPreferences {
-  try {
-    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<TreasuryPreferences>;
-    return { ...defaultPreferences, ...stored };
-  } catch {
-    return defaultPreferences;
-  }
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function currentMonthRange(now: Date): { start: string; end: string } {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { start: isoDate(start), end: isoDate(end) };
-}
+const IDLE_LEDGER: LedgerState = { loading: false, error: null, postings: [], pagingGapDetected: false, truncated: false, simulated: false }
 
 export default function useTreasuryReconciliation(accountId: string | null, network: NetworkName) {
-  const [periods, setPeriods] = useState<ReconciliationPeriod[]>([]);
-  const [activePeriodId, setActivePeriodId] = useState<string | null>(null);
-  const [result, setResult] = useState<ReconciliationResult | null>(null);
-  const [closedSnapshot, setClosedSnapshot] = useState<PeriodSnapshot | null>(null);
-  const [rules, setRules] = useState<CategoryRule[]>(DEFAULT_CATEGORY_RULES);
-  const [costBasisEntries, setCostBasisEntries] = useState<CostBasisEntry[]>([]);
-  const [review, setReview] = useState<ReviewRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<TreasuryReconciliationError | null>(null);
-  const [message, setMessage] = useState('');
-  const [preferences, setPreferencesState] = useState<TreasuryPreferences>(loadPreferences);
-  const controller = useRef<AbortController | null>(null);
+  const [ledger, setLedger] = useState<LedgerState>(IDLE_LEDGER)
+  const [rules, setRules] = useState<CategoryRule[]>(DEFAULT_CATEGORY_RULES)
+  const [labels, setLabels] = useState<CounterpartyLabel[]>([])
+  const [costBasisEntries, setCostBasisEntries] = useState<CostBasisEntry[]>([])
+  const [snapshots, setSnapshots] = useState<PeriodSnapshot[]>([])
+  const [period, setPeriod] = useState<ReconciliationPeriod | null>(null)
+  const controller = useRef<AbortController | null>(null)
 
-  const activePeriod = useMemo(() => periods.find((p) => p.id === activePeriodId) ?? null, [periods, activePeriodId]);
+  const loadPersisted = useCallback(async () => {
+    const [storedRules, storedLabels, storedCostBasis, storedSnapshots] = await Promise.all([
+      loadCategoryRules(),
+      loadCounterpartyLabels(),
+      loadCostBasisEntries(),
+      loadSnapshots(),
+    ])
+    if (storedRules.length) setRules(storedRules)
+    setLabels(storedLabels)
+    setCostBasisEntries(storedCostBasis)
+    setSnapshots(storedSnapshots)
+  }, [])
 
-  // ── Bootstrap: load persisted periods/rules/cost-basis/review, create a default period ──
   useEffect(() => {
-    if (!accountId) {
-      setPeriods([]);
-      setActivePeriodId(null);
-      setResult(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
+    void loadPersisted()
+  }, [loadPersisted])
+
+  const refresh = useCallback(
+    async (simulate = false) => {
+      controller.current?.abort()
+      const requestController = new AbortController()
+      controller.current = requestController
+      setLedger((prev) => ({ ...prev, loading: true, error: null }))
+
       try {
-        const [storedPeriods, storedRules, storedCostBasis, storedReview] = await Promise.all([
-          treasuryDb.getPeriods(accountId),
-          treasuryDb.getRules(accountId),
-          treasuryDb.getCostBasisEntries(accountId),
-          treasuryDb.getReviewState(accountId),
-        ]);
-        if (cancelled) return;
+        let transactions
+        let operations
+        let pagingGap
+        let truncated
+        let subjectAccount: string
 
-        let workingPeriods = storedPeriods;
-        if (workingPeriods.length === 0) {
-          const { start, end } = currentMonthRange(new Date());
-          const period: ReconciliationPeriod = {
-            id: `${accountId}:${network}:${start}`,
-            accountId,
-            network,
-            start,
-            end,
-            status: 'open',
-            createdAt: new Date().toISOString(),
-          };
-          await treasuryDb.savePeriod(period);
-          workingPeriods = [period];
+        if (simulate || !accountId) {
+          const fixture = buildFixtureLedger()
+          transactions = fixture.transactions
+          operations = fixture.operations
+          pagingGap = { gapDetected: false, details: [] }
+          truncated = false
+          subjectAccount = FIXTURE_ACCOUNT
+          if (!costBasisEntries.length) setCostBasisEntries(buildFixtureCostBasisEntries())
+        } else {
+          const result = await fetchAccountLedgerActivity(accountId, network, requestController.signal)
+          transactions = result.transactions
+          operations = result.operations
+          pagingGap = result.pagingGap
+          truncated = result.truncated
+          subjectAccount = accountId
         }
 
-        setPeriods(workingPeriods);
-        setActivePeriodId((current) => current ?? workingPeriods[workingPeriods.length - 1].id);
-        setRules(storedRules.length ? storedRules : DEFAULT_CATEGORY_RULES);
-        setCostBasisEntries(storedCostBasis);
-        setReview(storedReview);
-      } catch {
-        if (!cancelled) {
-          setError(
-            new TreasuryReconciliationError({
-              code: 'unavailable',
-              message: 'Unable to load saved reconciliation data from this browser.',
-              retryable: true,
-            })
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (requestController.signal.aborted) return
+        const { postings: rawPostings } = normalizeAccountActivity(subjectAccount, transactions, operations)
+        const categorized = applyRules(rawPostings, rules)
+        const labeled = labelCounterparties(categorized, labels)
+        setLedger({ loading: false, error: null, postings: labeled, pagingGapDetected: pagingGap.gapDetected, truncated, simulated: simulate || !accountId })
+      } catch (error) {
+        if (requestController.signal.aborted) return
+        setLedger({
+          loading: false,
+          error: error instanceof TreasuryFetchError ? error : new TreasuryFetchError({ code: 'unavailable', message: 'Unable to load ledger activity.', retryable: true }),
+          postings: [],
+          pagingGapDetected: false,
+          truncated: false,
+          simulated: false,
+        })
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accountId, network]);
+    },
+    [accountId, network, rules, labels, costBasisEntries.length]
+  )
 
-  // ── Fetch reconciliation data for the active period ──
-  const refresh = useCallback(async () => {
-    if (!accountId || !activePeriod) return;
-    controller.current?.abort();
-    const requestController = new AbortController();
-    controller.current = requestController;
-    setError(null);
-    if (result) setRefreshing(true);
-    else setLoading(true);
-
-    if (activePeriod.status === 'closed') {
-      try {
-        const snapshot = await treasuryDb.getSnapshot(activePeriod.id);
-        if (!requestController.signal.aborted) {
-          setClosedSnapshot(snapshot ?? null);
-          setResult(null);
-        }
-      } finally {
-        if (!requestController.signal.aborted) {
-          setLoading(false);
-          setRefreshing(false);
-        }
-      }
-      return;
-    }
-
-    setClosedSnapshot(null);
-    try {
-      const priorPeriod = periods
-        .filter((p) => p.end <= activePeriod.start)
-        .sort((a, b) => (a.end < b.end ? 1 : -1))[0];
-      const priorSnapshot = priorPeriod ? await treasuryDb.getSnapshot(priorPeriod.id) : undefined;
-      const openingBalances = priorSnapshot
-        ? Object.fromEntries(priorSnapshot.balances.map((b) => [b.asset.code, b.closing]))
-        : undefined;
-
-      const data = await fetchReconciliationPeriod(accountId, network, activePeriod, {
-        signal: requestController.signal,
-        rules,
-        costBasisEntries,
-        openingBalances,
-      });
-      if (requestController.signal.aborted) return;
-      setResult(data);
-    } catch (cause) {
-      if (!requestController.signal.aborted) {
-        setError(
-          cause instanceof TreasuryReconciliationError
-            ? cause
-            : new TreasuryReconciliationError({
-                code: 'unavailable',
-                message: 'Unable to load reconciliation data.',
-                retryable: true,
-              })
-        );
-      }
-    } finally {
-      if (!requestController.signal.aborted) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
+  useEffect(() => {
+    void refresh()
+    return () => controller.current?.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, network, activePeriod, rules, costBasisEntries, periods]);
+  }, [accountId, network])
 
-  useEffect(() => {
-    void refresh();
-    return () => controller.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePeriodId, activePeriod?.status]);
+  const updateRules = useCallback(async (next: CategoryRule[]) => {
+    setRules(next)
+    await saveCategoryRules(next)
+  }, [])
 
-  // ── Re-apply categories locally when rules change, without a full re-fetch ──
-  useEffect(() => {
-    setResult((current) => (current ? { ...current, postings: recategorize(current.postings, rules) } : current));
-  }, [rules]);
+  const updateLabels = useCallback(async (next: CounterpartyLabel[]) => {
+    setLabels(next)
+    await saveCounterpartyLabels(next)
+  }, [])
 
-  const setPreferences = useCallback((patch: Partial<TreasuryPreferences>) => {
-    setPreferencesState((current) => {
-      const next = { ...current, ...patch };
-      try {
-        localStorage.setItem(PREFS_KEY, JSON.stringify(next));
-      } catch {
-        /* storage may be disabled */
-      }
-      return next;
-    });
-  }, []);
+  const updateCostBasisEntries = useCallback(async (next: CostBasisEntry[]) => {
+    setCostBasisEntries(next)
+    await saveCostBasisEntries(next)
+  }, [])
 
-  // ── Periods ──
-  const createPeriod = useCallback(
-    async (start: string, end: string) => {
-      if (!accountId) return;
-      if (end <= start) {
-        setMessage('Period end must be after its start date.');
-        return;
-      }
-      const period: ReconciliationPeriod = {
-        id: `${accountId}:${network}:${start}`,
-        accountId,
-        network,
-        start,
-        end,
-        status: 'open',
-        createdAt: new Date().toISOString(),
-      };
-      await treasuryDb.savePeriod(period);
-      setPeriods((current) => [...current.filter((p) => p.id !== period.id), period]);
-      setActivePeriodId(period.id);
+  const buildReconciliationPeriod = useCallback(
+    (input: Omit<BuildPeriodInput, 'postings' | 'pagingGapDetected'>) => {
+      const next = buildPeriod({ ...input, postings: ledger.postings, pagingGapDetected: ledger.pagingGapDetected })
+      setPeriod(next)
+      return next
     },
-    [accountId, network]
-  );
+    [ledger.postings, ledger.pagingGapDetected]
+  )
 
-  const closePeriod = useCallback(async () => {
-    if (!activePeriod || !result) return;
-    if (result.discrepancies.some((d) => d.severity === 'critical')) {
-      setMessage('Cannot close a period with unresolved critical discrepancies.');
-      return;
+  const realizedGainLossByAsset = useMemo(() => {
+    if (!period) return new Map<string, RealizedGainLoss[]>()
+    const assets = Array.from(new Set(period.postings.map((p) => p.asset)))
+    const map = new Map<string, RealizedGainLoss[]>()
+    for (const asset of assets) {
+      map.set(asset, computeRealizedGainLoss(asset, period.postings, costBasisEntries).realized)
     }
-    const snapshot = buildPeriodSnapshot(
-      { ...activePeriod, status: 'closed', closedAt: new Date().toISOString() },
-      result.postings,
-      result.balances,
-      result.discrepancies,
-      review.filter((r) => result.postings.some((p) => p.id === r.targetId) || result.discrepancies.some((d) => d.id === r.targetId))
-    );
-    await treasuryDb.saveSnapshot(snapshot);
-    await treasuryDb.savePeriod(snapshot.period);
-    setPeriods((current) => current.map((p) => (p.id === snapshot.period.id ? snapshot.period : p)));
-    setMessage('Period closed. Its snapshot is now immutable.');
-  }, [activePeriod, result, review]);
+    return map
+  }, [period, costBasisEntries])
 
-  // ── Rules ──
-  const upsertRule = useCallback(
-    async (rule: CategoryRule) => {
-      if (!accountId) return;
-      const errors = validateRule(rule);
-      if (errors.length) {
-        setMessage(errors.join(' '));
-        return;
-      }
-      await treasuryDb.saveRule(accountId, rule);
-      setRules((current) => [...current.filter((r) => r.id !== rule.id), rule].sort((a, b) => a.priority - b.priority));
-    },
-    [accountId]
-  );
+  const allRealizedGainLoss = useMemo(() => Array.from(realizedGainLossByAsset.values()).flat(), [realizedGainLossByAsset])
 
-  const removeRule = useCallback(
-    async (ruleId: string) => {
-      if (!accountId) return;
-      await treasuryDb.deleteRule(accountId, ruleId);
-      setRules((current) => current.filter((r) => r.id !== ruleId));
-    },
-    [accountId]
-  );
+  const unresolvedItems = useMemo(() => (period ? findUnresolvedItems(period.postings, allRealizedGainLoss) : []), [period, allRealizedGainLoss])
 
-  // ── Cost basis ──
-  const upsertCostBasisEntry = useCallback(
-    async (entry: CostBasisEntry) => {
-      if (!accountId) return;
-      const errors = validateCostBasisEntry(entry);
-      if (errors.length) {
-        setMessage(errors.join(' '));
-        return;
-      }
-      await treasuryDb.saveCostBasisEntry(accountId, entry);
-      setCostBasisEntries((current) => [...current.filter((e) => e.id !== entry.id), entry]);
-    },
-    [accountId]
-  );
+  const saveCurrentSnapshot = useCallback(async () => {
+    if (!period) return null
+    const snapshot = await createPeriodSnapshot(period, `${period.id}-${Date.now()}`)
+    await saveSnapshot(snapshot)
+    setSnapshots((prev) => [snapshot, ...prev])
+    return snapshot
+  }, [period])
 
-  const removeCostBasisEntry = useCallback(
-    async (entryId: string) => {
-      if (!accountId) return;
-      await treasuryDb.deleteCostBasisEntry(accountId, entryId);
-      setCostBasisEntries((current) => current.filter((e) => e.id !== entryId));
-    },
-    [accountId]
-  );
-
-  // ── Review state ──
-  const setReviewStatus = useCallback(
-    async (targetId: string, targetType: ReviewRecord['targetType'], status: ReviewStatus, note?: string) => {
-      if (!accountId) return;
-      const record: ReviewRecord = { targetId, targetType, status, note, updatedAt: new Date().toISOString() };
-      await treasuryDb.saveReview(accountId, record);
-      setReview((current) => [...current.filter((r) => !(r.targetId === targetId && r.targetType === targetType)), record]);
-    },
-    [accountId]
-  );
-
-  // ── Export / import ──
-  const exportJson = useCallback(() => {
-    if (!activePeriod || !result) return;
-    const payload = buildExportPayload(activePeriod, result.postings, result.balances, result.discrepancies, review);
-    exportPeriodJson(payload);
-  }, [activePeriod, result, review]);
-
-  const exportCsv = useCallback(() => {
-    if (!activePeriod || !result) return;
-    const payload = buildExportPayload(activePeriod, result.postings, result.balances, result.discrepancies, review);
-    exportPeriodCsv(payload);
-  }, [activePeriod, result, review]);
-
-  const exportGenericLedger = useCallback(
-    (mapping: AccountingMapping = DEFAULT_ACCOUNTING_MAPPING) => {
-      if (!result) return;
-      exportGenericLedgerCsv(result.postings, mapping);
-    },
-    [result]
-  );
-
-  const importAndVerify = useCallback((raw: string) => {
-    const parsed = parseExportPayload(raw);
-    if (!parsed.ok) {
-      setMessage(`Import rejected: ${parsed.error}`);
-      return null;
-    }
-    setMessage(`Verified export for period ${parsed.data!.period.id} (${parsed.data!.postings.length} postings).`);
-    return parsed.data!;
-  }, []);
-
-  const unresolvedCount = useMemo(
-    () => (result?.discrepancies ?? closedSnapshot?.discrepancies ?? []).filter((d) => {
-      const reviewRecord = review.find((r) => r.targetId === d.id && r.targetType === 'discrepancy');
-      return !reviewRecord || reviewRecord.status === 'unresolved';
-    }).length,
-    [result, closedSnapshot, review]
-  );
+  const verifySnapshot = useCallback((snapshot: PeriodSnapshot) => verifySnapshotIntegrity(snapshot), [])
 
   return {
-    periods,
-    activePeriod,
-    setActivePeriodId,
-    result,
-    closedSnapshot,
+    ledger,
     rules,
+    labels,
     costBasisEntries,
-    review,
-    loading,
-    refreshing,
-    error,
-    message,
-    clearMessage: () => setMessage(''),
-    preferences,
-    setPreferences,
-    unresolvedCount,
+    snapshots,
+    period,
+    realizedGainLossByAsset,
+    unresolvedItems,
     refresh,
-    createPeriod,
-    closePeriod,
-    upsertRule,
-    removeRule,
-    upsertCostBasisEntry,
-    removeCostBasisEntry,
-    setReviewStatus,
-    exportJson,
-    exportCsv,
-    exportGenericLedger,
-    importAndVerify,
-  };
+    updateRules,
+    updateLabels,
+    updateCostBasisEntries,
+    buildReconciliationPeriod,
+    saveCurrentSnapshot,
+    verifySnapshot,
+    setPeriod,
+  }
 }

@@ -67,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'governance', label: 'Governance', icon: '🏛' },
   { id: 'alertRules', label: 'Alerts', icon: '🔔' },
   { id: 'portfolio', label: 'Portfolio', icon: '◐' },
+  { id: 'treasuryReconciliation', label: 'Treasury', icon: '⚖' },
   { id: 'charts', label: 'Charts', icon: '▤' },
   { id: 'analytics', label: 'Analytics', icon: '◍' },
   { id: 'behaviorInsights', label: 'Personalization', icon: '◌' },

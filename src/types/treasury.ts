@@ -1,258 +1,186 @@
-/**
- * Treasury reconciliation & accounting exports domain model (#97).
- *
- * These are operational records reconstructed from public ledger activity —
- * NOT tax or accounting advice, and independent of the AI portfolio
- * optimizer (#33). Every derived value carries a `Provenance` entry so a
- * reviewer can trace it back to the source ledger activity that produced it.
- */
+export const JOURNAL_SCHEMA_VERSION = 1 as const
+export const SNAPSHOT_SCHEMA_VERSION = 1 as const
 
-// ─── Assets ─────────────────────────────────────────────────────────────────────
-
-export type AssetKind = 'native' | 'credit' | 'liquidity_pool' | 'contract';
-
-export interface TreasuryAsset {
-  kind: AssetKind;
-  /** Stable identifier used as a map/grouping key, e.g. "XLM" or "USDC:GABC...". */
-  code: string;
-  issuer?: string;
-  contractId?: string;
-  /** Display decimals; Stellar classic assets are always 7. */
-  decimals: number;
-}
-
-export const NATIVE_ASSET: TreasuryAsset = { kind: 'native', code: 'XLM', decimals: 7 };
-
-// ─── Provenance ───────────────────────────────────────────────────────────────
-
-export type ProvenanceSourceType =
-  | 'operation'
-  | 'transaction-fee'
-  | 'trade'
-  | 'effect'
-  | 'manual-adjustment'
-  | 'rule';
-
-export interface Provenance {
-  sourceType: ProvenanceSourceType;
-  /** Horizon paging token / id / hash of the record this value was derived from. */
-  sourceId: string;
-  /** Other posting/discrepancy ids this value was derived from, if any. */
-  derivedFrom?: string[];
-  /** Id of the rule that produced a category/label, if applicable. */
-  ruleId?: string;
-  note?: string;
-}
-
-// ─── Ledger postings ────────────────────────────────────────────────────────────
-
-export type PostingKind =
-  | 'payment'
-  | 'path_payment'
+export type PostingType =
+  | 'payment-in'
+  | 'payment-out'
   | 'trade'
   | 'fee'
-  | 'claimable_balance_create'
-  | 'claimable_balance_claim'
+  | 'claimable-balance-out'
+  | 'claimable-balance-in'
   | 'sponsorship'
-  | 'contract_transfer'
-  | 'account_change';
+  | 'contract-transfer'
+  | 'account-change'
+  | 'other'
+
+export type ProvenanceSource = 'derived' | 'rule' | 'manual'
+
+export interface Provenance {
+  source: ProvenanceSource
+  note: string
+}
 
 export interface LedgerPosting {
-  id: string;
-  txHash: string;
-  operationId?: string;
-  ledger: number;
-  timestamp: string;
-  kind: PostingKind;
-  asset: TreasuryAsset;
-  /** Signed decimal amount string (Stellar precision); positive = inflow, negative = outflow. */
-  amount: string;
-  counterparty?: string;
-  counterpartyLabel?: string;
-  memo?: string;
-  category?: string;
-  successful: boolean;
-  provenance: Provenance;
-  /** Set when normalization could not fully resolve the posting (e.g. an
-   * unrecognized contract invocation) and it needs manual review. */
-  needsReview?: boolean;
-  reviewReason?: string;
+  id: string
+  txHash: string
+  operationId: string
+  ledgerCloseTime: string
+  type: PostingType
+  asset: string
+  /** Signed amount in the account's perspective: positive = credit, negative = debit. Decimal string, up to 7 fractional digits. */
+  amount: string
+  counterparty: string | null
+  memo: string | null
+  transactionSuccessful: boolean
+  category: string | null
+  counterpartyLabel: string | null
+  provenance: Provenance
 }
-
-// ─── Rules ──────────────────────────────────────────────────────────────────────
-
-export interface CategoryRule {
-  id: string;
-  /** Evaluated in ascending order; first match wins. */
-  priority: number;
-  enabled: boolean;
-  name: string;
-  /** Case-insensitive substring/exact matchers; all provided fields must match. */
-  match: {
-    counterparty?: string;
-    assetCode?: string;
-    memoContains?: string;
-    kind?: PostingKind;
-  };
-  category: string;
-  counterpartyLabel?: string;
-}
-
-// ─── Cost basis ───────────────────────────────────────────────────────────────
-
-export interface CostBasisEntry {
-  id: string;
-  assetCode: string;
-  /** ISO date (yyyy-mm-dd) the price applies from, effective until superseded. */
-  effectiveDate: string;
-  pricePerUnit: string;
-  currency: string;
-  source: string;
-  note?: string;
-}
-
-// ─── Discrepancies & review ─────────────────────────────────────────────────────
-
-export type DiscrepancySeverity = 'info' | 'warning' | 'critical';
-
-export type DiscrepancyKind =
-  | 'unexplained-delta'
-  | 'paging-gap'
-  | 'rounding'
-  | 'missing-price'
-  | 'unresolved-contract-transfer'
-  | 'asset-code-collision'
-  | 'failed-transaction-fee';
 
 export interface Discrepancy {
-  id: string;
-  periodId: string;
-  kind: DiscrepancyKind;
-  severity: DiscrepancySeverity;
-  assetCode?: string;
-  message: string;
-  expected?: string;
-  actual?: string;
-  postingIds: string[];
-  provenance: Provenance;
+  asset: string
+  expectedClosing: string
+  computedClosing: string
+  differenceAbs: string
+  differencePct: number | null
+  possibleCauses: string[]
 }
 
-export type ReviewStatus = 'unresolved' | 'resolved' | 'flagged';
-
-export interface ReviewRecord {
-  /** id of the LedgerPosting or Discrepancy being reviewed. */
-  targetId: string;
-  targetType: 'posting' | 'discrepancy';
-  status: ReviewStatus;
-  reviewer?: string;
-  note?: string;
-  updatedAt: string;
+export interface AssetWaterfallStep {
+  asset: string
+  opening: string
+  inflow: string
+  outflow: string
+  fees: string
+  closing: string
 }
 
-// ─── Periods & balances ─────────────────────────────────────────────────────────
-
-export type PeriodStatus = 'open' | 'closed';
+export type ReconciliationStatus = 'open' | 'closed'
+export type ReviewStatus = 'unreviewed' | 'in-review' | 'approved'
 
 export interface ReconciliationPeriod {
-  id: string;
-  accountId: string;
-  network: string;
-  /** ISO date, inclusive. */
-  start: string;
-  /** ISO date, exclusive. */
-  end: string;
-  status: PeriodStatus;
-  createdAt: string;
-  closedAt?: string;
+  id: string
+  label: string
+  startTime: string
+  endTime: string
+  status: ReconciliationStatus
+  reviewStatus: ReviewStatus
+  openingBalances: Record<string, string>
+  actualClosingBalances: Record<string, string> | null
+  postings: LedgerPosting[]
+  waterfall: AssetWaterfallStep[]
+  discrepancies: Discrepancy[]
+  pagingGapDetected: boolean
 }
 
-export interface AssetBalance {
-  asset: TreasuryAsset;
-  opening: string;
-  closing: string;
-  netChange: string;
-  inflow: string;
-  outflow: string;
-  postingCount: number;
+export type RuleMatcherField = 'type' | 'asset' | 'counterparty' | 'memo'
+
+export interface RuleMatcher {
+  field: RuleMatcherField
+  pattern: string
 }
 
-// ─── Immutable snapshots ────────────────────────────────────────────────────────
+export interface CategoryRule {
+  id: string
+  priority: number
+  matchers: RuleMatcher[]
+  category: string
+  enabled: boolean
+}
 
-export const SNAPSHOT_SCHEMA_VERSION = 1 as const;
+export interface CounterpartyLabel {
+  address: string
+  label: string
+  tags: string[]
+}
+
+export interface CostBasisEntry {
+  asset: string
+  unitPrice: string
+  currency: string
+  effectiveAt: string
+  source: string
+}
+
+export interface DisposalLot {
+  asset: string
+  acquiredAt: string
+  quantity: string
+  unitCost: string
+}
+
+export interface RealizedGainLoss {
+  asset: string
+  disposedAt: string
+  quantity: string
+  proceedsPerUnit: string
+  costBasisPerUnit: string
+  gainLoss: string
+  costBasisMissing: boolean
+}
+
+export type UnresolvedReason = 'uncategorized' | 'missing-cost-basis' | 'discrepancy' | 'failed-transaction'
+
+export interface UnresolvedItem {
+  postingId: string
+  reason: UnresolvedReason
+  detail: string
+}
 
 export interface PeriodSnapshot {
-  schemaVersion: typeof SNAPSHOT_SCHEMA_VERSION;
-  period: ReconciliationPeriod;
-  postings: LedgerPosting[];
-  balances: AssetBalance[];
-  discrepancies: Discrepancy[];
-  review: ReviewRecord[];
-  generatedAt: string;
-  /** Deterministic checksum of postings+balances, so a re-derived snapshot
-   * for the same period can be compared for byte-for-byte equality. */
-  checksum: string;
+  schemaVersion: typeof SNAPSHOT_SCHEMA_VERSION
+  id: string
+  periodId: string
+  generatedAt: string
+  period: ReconciliationPeriod
+  contentHash: string
 }
 
-// ─── Data / request state (mirrors FraudDataState) ──────────────────────────────
+export interface JournalEntry {
+  date: string
+  reference: string
+  account: string
+  debit: string
+  credit: string
+  memo: string
+  asset: string
+}
 
-export type TreasuryDataState = 'live' | 'degraded' | 'simulation';
+export interface AccountMappingRule {
+  postingType: PostingType
+  category: string | null
+  debitAccount: string
+  creditAccount: string
+}
+
+export interface JournalExport {
+  schemaVersion: typeof JOURNAL_SCHEMA_VERSION
+  format: 'csv' | 'json'
+  periodId: string
+  generatedAt: string
+  rowCount: number
+  checksum: string
+  entries: JournalEntry[]
+}
+
+export interface ImportValidationIssue {
+  row: number
+  message: string
+}
+
+export interface ImportValidationResult {
+  valid: boolean
+  issues: ImportValidationIssue[]
+  entries: JournalEntry[]
+}
+
+export interface PagingGapReport {
+  gapDetected: boolean
+  details: string[]
+}
 
 export interface TreasuryApiError {
-  code: 'timeout' | 'unavailable' | 'invalid-response' | 'rate-limited' | 'aborted' | 'invalid-input';
-  message: string;
-  retryable: boolean;
-  requestId?: string;
-}
-
-export interface ReconciliationResult {
-  state: TreasuryDataState;
-  period: ReconciliationPeriod;
-  postings: LedgerPosting[];
-  balances: AssetBalance[];
-  discrepancies: Discrepancy[];
-  generatedAt: string;
-  requestId: string;
-  /** True when pagination hit the configured cap before exhausting history —
-   * surfaced so large-history reconciliation is never silently partial. */
-  truncated: boolean;
-}
-
-// ─── Export / import contracts ──────────────────────────────────────────────────
-
-export const EXPORT_SCHEMA_VERSION = 1 as const;
-export const SUPPORTED_EXPORT_VERSIONS: readonly number[] = [1];
-
-export interface TreasuryExportPayload {
-  version: typeof EXPORT_SCHEMA_VERSION;
-  exportedAt: string;
-  period: ReconciliationPeriod;
-  postings: LedgerPosting[];
-  balances: AssetBalance[];
-  discrepancies: Discrepancy[];
-  review: ReviewRecord[];
-}
-
-export interface AccountingMappingEntry {
-  category: string;
-  accountCode: string;
-  accountName: string;
-}
-
-export interface AccountingMapping {
-  id: string;
-  name: string;
-  entries: AccountingMappingEntry[];
-  /** Category used when a posting's category has no matching entry. */
-  defaultAccountCode: string;
-}
-
-export interface GenericLedgerRow {
-  date: string;
-  accountCode: string;
-  accountName: string;
-  description: string;
-  debit: string;
-  credit: string;
-  assetCode: string;
-  reference: string;
+  code: 'invalid-account' | 'timeout' | 'unavailable' | 'rate-limited' | 'aborted' | 'oversized'
+  message: string
+  retryable: boolean
 }

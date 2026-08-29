@@ -1,115 +1,111 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright'
+import { expect, test, type Page } from '@playwright/test'
 
-const ACCOUNT = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
+const ACCOUNT = 'GCABR6KL52ARFBCF2YBZLSXPH6T6GOXXPUEOP5D3T5HTSUZJHHXVZUE5'
+const COUNTERPARTY = 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAJWL'
+const HORIZON_BASE = 'https://horizon-testnet.stellar.org'
 
-async function openTreasuryReconciliation(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'stellar:behavior-analytics:v1',
-      JSON.stringify({ version: 1, consent: { status: 'denied', usage: false, personalization: false }, events: [] })
-    );
-    localStorage.setItem('tutorial_state', JSON.stringify({ completed_welcome: Date.now() }));
-    localStorage.setItem('stellar-dashboard-theme', 'dark');
-    document.addEventListener('DOMContentLoaded', () => {
-      const style = document.createElement('style');
-      style.textContent = '*,*::before,*::after{animation:none!important;transition:none!important}';
-      document.head.appendChild(style);
-    });
-  });
-  // Block every non-localhost request so Horizon calls fail and the
-  // dashboard exercises its deterministic simulation fallback — the same
-  // pattern used by every other engine feature's E2E suite in this repo.
-  await page.route(/^https?:\/\//, async (route) => {
-    const hostname = new URL(route.request().url()).hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') await route.continue();
-    else await route.abort('blockedbyclient');
-  });
-  await page.goto('/connect', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((account) => {
-    const dashboardWindow = window as typeof window & {
-      __store?: { getState: () => { setConnectedAddress: (_value: string) => void } };
-    };
-    dashboardWindow.__store?.getState().setConnectedAddress(account);
-  }, ACCOUNT);
-  await page.getByRole('button', { name: 'Treasury Reconciliation', exact: true }).click();
-  await expect(page).toHaveURL(/\/treasuryReconciliation(?:\?|$)/);
-  // Unlike the fixture-only fraud-detection dashboard, this workspace always
-  // attempts a live Horizon fetch first and only falls back to the
-  // deterministic simulation snapshot once those calls reject — so the
-  // loading state can legitimately persist for a few seconds under a
-  // blocked-network E2E run. Wait for it to clear before asserting on the
-  // now-rendered heading, rather than racing the two.
-  await expect(page.getByText(/Loading reconciliation data/i)).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByRole('heading', { name: /Treasury reconciliation/i })).toBeVisible({ timeout: 20_000 });
+function transactionRecord(hash: string, successful = true) {
+  return {
+    hash, source_account: ACCOUNT, successful, fee_charged: '100', paging_token: hash,
+    created_at: '2026-01-15T00:00:00.000Z', memo: 'invoice-42',
+  }
 }
 
-test.describe('treasury reconciliation workflow', () => {
-  test('shows the simulation snapshot with balances and postings when Horizon is unreachable', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    await expect(page.getByText(/deterministic demonstration snapshot/i)).toBeVisible();
-    await expect(page.getByText('Asset balance waterfall')).toBeVisible();
+function paymentOperation(id: string, txHash: string, from: string, to: string, amount: string) {
+  return {
+    id, type: 'payment', transaction_hash: txHash, transaction_successful: true,
+    created_at: '2026-01-15T00:00:00.000Z', paging_token: id,
+    from, to, amount, asset_type: 'native',
+  }
+}
 
-    await page.getByRole('button', { name: 'postings', exact: true }).click();
-    // The demo fixture includes more than one payment-kind posting.
-    await expect(page.getByText('payment').first()).toBeVisible();
-  });
+async function mockHorizonAccountHistory(page: Page) {
+  await page.route(`${HORIZON_BASE}/accounts/${ACCOUNT}/transactions*`, async (route) => {
+    await route.fulfill({ status: 200, json: { _embedded: { records: [transactionRecord('e2e-tx-1')] }, _links: {} } })
+  })
+  await page.route(`${HORIZON_BASE}/accounts/${ACCOUNT}/operations*`, async (route) => {
+    await route.fulfill({ status: 200, json: { _embedded: { records: [paymentOperation('e2e-op-1', 'e2e-tx-1', COUNTERPARTY, ACCOUNT, '42.5000000')] }, _links: {} } })
+  })
+}
 
-  test('adds a category rule and sees it applied to matching postings', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    await page.getByRole('button', { name: 'rules', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Category rules' })).toBeVisible();
+async function openTreasuryDashboard(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('stellar-dashboard-theme', 'dark')
+    localStorage.setItem('tutorial_state', JSON.stringify({ completed_welcome: Date.now() }))
+    localStorage.setItem(
+      'stellar:behavior-analytics:v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        pseudonymousId: 'e2e-visitor',
+        consent: { status: 'denied', usage: false, personalization: false, updatedAt: new Date().toISOString(), policyVersion: 1 },
+        events: [],
+        assignments: [],
+      })
+    )
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style')
+      style.textContent = '*,*::before,*::after{animation:none!important;transition:none!important}'
+      document.head.appendChild(style)
+    })
+  })
+  await page.route(/^https?:\/\//, async (route) => {
+    const hostname = new URL(route.request().url()).hostname
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'horizon-testnet.stellar.org') await route.continue()
+    else await route.abort('blockedbyclient')
+  })
+  await mockHorizonAccountHistory(page)
+  await page.goto('/connect', { waitUntil: 'domcontentloaded' })
+  await page.evaluate((account) => {
+    const dashboardWindow = window as typeof window & {
+      __store?: { getState: () => { setConnectedAddress: (_value: string) => void } }
+    }
+    dashboardWindow.__store?.getState().setConnectedAddress(account)
+  }, ACCOUNT)
+  await page.getByRole('button', { name: 'Treasury', exact: true }).click()
+  await expect(page).toHaveURL(/\/treasuryReconciliation(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: /Reconciliation.*accounting exports/i })).toBeVisible()
+  await expect(page.getByText(/Loading ledger activity/i)).toBeHidden({ timeout: 15_000 })
+}
 
-    await page.getByRole('textbox', { name: 'Rule name' }).fill('Trading counterparty');
-    await page.getByRole('textbox', { name: 'Match counterparty contains' }).fill('DEMOTRADER');
-    await page.getByRole('textbox', { name: 'Category' }).fill('trading');
-    await page.getByRole('button', { name: 'Add rule' }).click();
+test.describe('Treasury reconciliation workflow', () => {
+  test('builds a period and shows the balance waterfall from real account history', async ({ page }) => {
+    await openTreasuryDashboard(page)
+    await page.getByLabel('Period start time').fill('2000-01-01T00:00:00.000Z')
+    await page.getByLabel('Period end time').fill('2100-01-01T00:00:00.000Z')
+    await page.getByRole('button', { name: 'Build period' }).click()
+    await expect(page.getByRole('heading', { name: 'Balance waterfall' })).toBeVisible()
+    await expect(page.getByText('42.5').first()).toBeVisible()
+  })
 
-    await expect(page.getByText('Trading counterparty')).toBeVisible();
+  test('exports a CSV journal after building a period', async ({ page }) => {
+    await openTreasuryDashboard(page)
+    await page.getByRole('button', { name: 'Build period' }).click()
+    await page.getByRole('button', { name: 'exports', exact: true }).click()
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: /Download CSV/i }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toMatch(/journal-.*\.csv/)
+  })
 
-    await page.getByRole('button', { name: 'postings', exact: true }).click();
-    // Both legs of the demo trade posting match this counterparty rule.
-    await expect(page.getByText('trading').first()).toBeVisible();
-  });
+  test('lets the user add a category rule', async ({ page }) => {
+    await openTreasuryDashboard(page)
+    await page.getByRole('button', { name: 'rules', exact: true }).click()
+    await page.getByLabel('Rule counterparty pattern').fill(COUNTERPARTY)
+    await page.getByLabel('Rule category').fill('Vendor payments')
+    await page.getByRole('button', { name: 'Add rule' }).click()
+    await expect(page.getByText('Vendor payments')).toBeVisible()
+  })
 
-  test('adds a cost-basis entry and the missing-price discrepancy for that asset clears on refresh', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    await page.getByRole('button', { name: 'unresolved', exact: true }).click();
-    const unresolvedBefore = await page.getByRole('heading', { name: 'Unresolved items' }).isVisible();
-    expect(unresolvedBefore).toBe(true);
+  test('shows the operational-record disclaimer on the methodology tab', async ({ page }) => {
+    await openTreasuryDashboard(page)
+    await page.getByRole('button', { name: 'methodology', exact: true }).click()
+    await expect(page.getByText(/not tax or accounting advice/i)).toBeVisible()
+  })
 
-    await page.getByRole('button', { name: 'Cost basis', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Asset code' }).fill('DEMOTOKEN');
-    await page.getByRole('textbox', { name: 'Price per unit' }).fill('1.5');
-    await page.getByRole('textbox', { name: 'Price source' }).fill('manual-test');
-    await page.getByRole('button', { name: 'Add price' }).click();
-    await expect(page.getByText('manual-test')).toBeVisible();
-  });
-
-  test('exports a JSON accounting record as a file download', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: /export json/i }).click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/\.json$/);
-  });
-
-  test('closes an open period, after which its snapshot becomes immutable', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    await page.getByRole('button', { name: /close period/i }).click();
-    await expect(page.getByText(/This period is closed/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /close period/i })).toHaveCount(0);
-  });
-
-  test('exposes an accessible overview and postings table with no critical/serious axe violations', async ({ page }) => {
-    await openTreasuryReconciliation(page);
-    await page.getByRole('button', { name: 'postings', exact: true }).click();
-
-    const results = await new AxeBuilder({ page })
-      .include('[aria-labelledby="treasury-title"]')
-      .withTags(['wcag2a', 'wcag2aa'])
-      .analyze();
-    const serious = results.violations.filter((violation) => violation.impact === 'critical' || violation.impact === 'serious');
-    expect(serious).toEqual([]);
-  });
-});
+  test('has no detectable accessibility violations on the default view', async ({ page }) => {
+    await openTreasuryDashboard(page)
+    const results = await new AxeBuilder({ page }).include('[aria-labelledby="treasury-title"]').analyze()
+    expect(results.violations).toEqual([])
+  })
+})
