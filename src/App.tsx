@@ -133,6 +133,7 @@ const TABS: Record<string, TabComponent> = {
   qaSystem: lazyTab(() => import('./components/dashboard/QASystem')),
   contractTesting: lazyTab(() => import('./components/contract-testing/ContractTestingDashboard')),
   fraudDetection: lazyTab(() => import('./components/fraud/FraudDetectionDashboard')),
+  tradingEngine: lazyTab(() => import('./components/trading/TradingEngineDashboard')),
   treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
