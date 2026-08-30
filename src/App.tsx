@@ -136,9 +136,10 @@ const TABS: Record<string, TabComponent> = {
   treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
+  assetControl: lazyNamedTab(() => import('./components/asset-control'), 'AssetControlCenter'),
 }
 
-const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics']
+const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics', 'assetControl']
 
 function TabLoadingFallback() {
   return (
@@ -233,7 +234,7 @@ function DashboardLayout() {
   const { track: trackBehavior } = useBehaviorAnalytics()
 
   useEffect(() => {
-    pruneCaches().catch(() => {})
+    pruneCaches().catch(() => { })
     return initializeTransactionOutbox()
   }, [])
 
@@ -595,7 +596,7 @@ function RouterSync() {
                 fetchTransactions(addr, targetNetwork, 50, null, s),
               ),
             initialPageParam: null,
-          }).catch(() => {})
+          }).catch(() => { })
           queryClient.prefetchInfiniteQuery({
             queryKey: ['operations', addr, targetNetwork, 'infinite', 50],
             queryFn: ({ signal: s }) =>
@@ -603,11 +604,11 @@ function RouterSync() {
                 fetchOperations(addr, targetNetwork, 50, null, s),
               ),
             initialPageParam: null,
-          }).catch(() => {})
+          }).catch(() => { })
         })
         .catch(() => { /* URL had an invalid/unfunded address — stay on connect screen */ })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── 2. Path → tab: when browser navigates (back/forward or direct URL), update store ──
@@ -658,9 +659,9 @@ function RouterSync() {
         { replace: false },
       )
     }
-  // searchParams intentionally omitted: we only want this to run when address/network change,
-  // not on every searchParams object reference update (which would cause an infinite loop)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // searchParams intentionally omitted: we only want this to run when address/network change,
+    // not on every searchParams object reference update (which would cause an infinite loop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, network])
 
   return null
