@@ -56,6 +56,8 @@
         "analytics": "分析",
         "systemHealth": "システム状況",
         "audit": "監査ログ",
+        "bridgeMonitor": "ブリッジモニター",
+        "qaSystem": "AI QAシステム",
         "compare": "比較"
     },
     "connect": {

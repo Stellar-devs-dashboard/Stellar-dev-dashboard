@@ -191,3 +191,7 @@ The dashboard includes a layered fraud workspace at `/fraudDetection`: explainab
 # Treasury Reconciliation & Accounting Exports
 
 The dashboard includes a treasury reconciliation workspace at `/treasuryReconciliation`: deterministic period reconciliation of payments, path payments, trades, fees, claimable balances, sponsorship changes, Soroban token transfers, and account changes into traceable ledger postings, with configurable category rules, cost-basis inputs, discrepancy detection, immutable period snapshots, and versioned CSV/JSON accounting exports. These are operational records, not tax or accounting advice, and are independent of the AI portfolio optimizer. See [the architecture, data model, and export format guide](docs/treasury-reconciliation.md).
+
+# Privacy-safe Diagnostics
+
+The public `/diagnostics` workspace captures bounded redact-before-memory evidence, runs cancellable non-destructive endpoint/wallet/transaction/rendering/storage/service-worker checks, and builds field-selectable SHA-256 diagnostic bundles for local download and comparison. It has no telemetry or upload transport and falls back to bounded memory when browser storage is unavailable. See [the architecture, privacy model, bundle contract, recovery guide, and maintainer integration](docs/diagnostics.md).

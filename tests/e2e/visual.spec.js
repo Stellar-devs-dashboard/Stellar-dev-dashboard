@@ -8,13 +8,17 @@ import { test, expect } from '@playwright/test';
  * so screenshots are deterministic across runs.
  */
 
-const TESTNET_KEY = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
+// Deterministic, checksum-valid public key. Network requests are blocked below,
+// so the connected-state snapshots exercise rendering rather than live Testnet data.
+const TESTNET_KEY = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
 
 test.beforeEach(async ({ page }) => {
   // Visual tests must not depend on live ledger/price responses or motion timing.
   // Install the deterministic environment before any application script runs.
   await page.addInitScript(() => {
     Math.random = () => 0.5;
+    // Prevent the delayed first-visit tour from racing the 1.5 second snapshot boundary.
+    localStorage.setItem('tutorial_state', JSON.stringify({ completed_welcome: 1 }));
     document.addEventListener('DOMContentLoaded', () => {
       const style = document.createElement('style');
       style.textContent = `
