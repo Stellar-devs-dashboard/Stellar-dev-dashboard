@@ -420,7 +420,7 @@ export default function Sidebar({ isMobile = false }: SidebarProps) {
         >
           <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {personalizedItems.length > 0 && (
-              <li role="presentation">
+              <li>
                 <div
                   style={{
                     fontSize: '9px',
@@ -439,7 +439,7 @@ export default function Sidebar({ isMobile = false }: SidebarProps) {
               const isActive = activeTab === item.id;
               const isDisabled = item.id === 'faucet' && network === 'mainnet';
               return (
-                <li key={`personalized-${item.id}`} role="presentation">
+                <li key={`personalized-${item.id}`}>
                   <button
                     onClick={() => !isDisabled && handleNavClick(item.id)}
                     disabled={isDisabled}
@@ -475,7 +475,7 @@ export default function Sidebar({ isMobile = false }: SidebarProps) {
             {NAV_ITEMS.map((item, i) => {
               if (item.type === 'header') {
                 return (
-                  <li key={`header-${i}`} role="presentation">
+                  <li key={`header-${i}`}>
                     <div
                       style={{
                         fontSize: '9px',
@@ -498,7 +498,7 @@ export default function Sidebar({ isMobile = false }: SidebarProps) {
               const isDisabled = item.id === 'faucet' && network === 'mainnet';
 
               return (
-                <li key={item.id} role="presentation">
+                <li key={item.id}>
                   <button
                     onClick={() => !isDisabled && handleNavClick(item.id)}
                     disabled={isDisabled}
