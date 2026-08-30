@@ -111,3 +111,18 @@ services:
       timeout: 3s
       retries: 3
     profiles: [testing]
+
+  devops-automation:
+    build:
+      context: ./services/devops-automation
+    ports:
+      - "3009:3009"
+    environment:
+      - PORT=3009
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3009/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+

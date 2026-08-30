@@ -136,9 +136,10 @@ const TABS: Record<string, TabComponent> = {
   treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
+  devopsAutomation: lazyTab(() => import('./components/devops-automation/DevOpsAutomationDashboard')),
 }
 
-const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics']
+const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics', 'devopsAutomation']
 
 function TabLoadingFallback() {
   return (

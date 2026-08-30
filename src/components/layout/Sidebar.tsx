@@ -52,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'resourceProfiling', label: 'Resource Profiling', icon: '📊' },
   { id: 'bridgeMonitor', label: 'Bridge Monitor', icon: '⇄' },
   { id: 'qaSystem', label: 'AI QA System', icon: '⚛' },
+  { id: 'devopsAutomation', label: 'AI DevOps', icon: '🤖' },
 
   { type: 'header', label: 'EXPLORE' },
   { id: 'dex', label: 'DEX', icon: '⇌' },
