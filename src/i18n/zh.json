@@ -56,6 +56,8 @@
         "analytics": "分析",
         "systemHealth": "系统健康",
         "audit": "审计日志",
+        "bridgeMonitor": "桥接监控",
+        "qaSystem": "AI 问答系统",
         "compare": "比较"
     },
     "connect": {
@@ -107,9 +109,7 @@
         "sourceAccount": "源账户",
         "ledger": "账本",
         "noTransactions": "未找到交易",
-        "loadMore": "加载更多",
-        "count_one": "{{count}} 笔交易",
-        "count_other": "{{count}} 笔交易"
+        "loadMore": "加载更多"
     },
     "contracts": {
         "title": "合约",

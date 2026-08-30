@@ -5,9 +5,11 @@ import App from "./App";
 import "./styles/globals.css";
 import { initPerformanceMonitoring } from "./lib/performance";
 import { registerServiceWorker } from "./utils/offline";
+import { installBrowserDiagnosticCapture } from "./lib/diagnostics";
 
 // Initialize performance monitoring (no RUM endpoint by default)
 initPerformanceMonitoring();
+installBrowserDiagnosticCapture();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
