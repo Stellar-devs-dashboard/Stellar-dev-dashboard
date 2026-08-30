@@ -136,6 +136,7 @@ const TABS: Record<string, TabComponent> = {
   treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
+  feeBumpStudio: lazyTab(() => import('./components/fee-bump-sponsorship/FeeBumpSponsorshipDashboard')),
 }
 
 const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics']

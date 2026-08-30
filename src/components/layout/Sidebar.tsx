@@ -43,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   
   { type: 'header', label: 'BUILD' },
   { id: 'builder', label: 'Builder', icon: '⚒' },
+  { id: 'feeBumpStudio', label: 'Fee-Bump Studio', icon: '⚡' },
   { id: 'txSimulator', label: 'Simulator', icon: '▷' },
   { id: 'advancedSim', label: 'Advanced Sim', icon: '⚡' },
   { id: 'faucet', label: 'Faucet', icon: '⬡' },
