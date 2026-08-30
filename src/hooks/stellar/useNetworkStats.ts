@@ -40,6 +40,6 @@ export function useNetworkStats(
     placeholderData: (prev) => prev,
     enabled,
     // Background refetch only — don't auto-focus refetch for short intervals
-    refetchOnWindowFocus: (refetchInterval ?? 0) >= 30_000,
+    refetchOnWindowFocus: refetchInterval !== false && refetchInterval >= 30_000,
   })
 }

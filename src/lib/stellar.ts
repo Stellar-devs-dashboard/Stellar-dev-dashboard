@@ -630,6 +630,95 @@ export async function fetchTransactionDetails(
   return result
 }
 
+// ─── Trades & Effects ─────────────────────────────────────────────────────────
+// Added for treasury reconciliation: operations/transactions alone don't expose
+// executed-trade fills or balance-level sponsorship/fee effects, so these two
+// endpoints round out the data reconciliation needs.
+
+export async function fetchTrades(
+  publicKey: string,
+  network: NetworkName = 'testnet',
+  limit = 20,
+  cursor: string | null = null,
+  signal?: AbortSignal
+): Promise<{
+  records: StellarSdk.Horizon.ServerApi.TradeRecord[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}> {
+  const cacheKey = `trades:${publicKey}:${network}:${limit}:${cursor || 'null'}`;
+  const cached = stellarCache.get<{
+    records: StellarSdk.Horizon.ServerApi.TradeRecord[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }>(cacheKey);
+  if (cached) return cached;
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const server = getServer(network);
+  const request = server.trades().forAccount(publicKey).order('desc').limit(limit);
+
+  if (cursor) request.cursor(cursor);
+
+  const trades = await request.call();
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const records = trades.records || [];
+  const nextCursor = records.length > 0 ? records[records.length - 1].paging_token : null;
+
+  const result = {
+    records,
+    nextCursor,
+    hasMore: records.length === limit && !!nextCursor,
+  };
+  stellarCache.set(cacheKey, result, TTL.OPERATIONS, ['trades', publicKey]);
+  return result;
+}
+
+export async function fetchEffects(
+  publicKey: string,
+  network: NetworkName = 'testnet',
+  limit = 20,
+  cursor: string | null = null,
+  signal?: AbortSignal
+): Promise<{
+  records: StellarSdk.Horizon.ServerApi.EffectRecord[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}> {
+  const cacheKey = `effects:${publicKey}:${network}:${limit}:${cursor || 'null'}`;
+  const cached = stellarCache.get<{
+    records: StellarSdk.Horizon.ServerApi.EffectRecord[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }>(cacheKey);
+  if (cached) return cached;
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const server = getServer(network);
+  const request = server.effects().forAccount(publicKey).order('desc').limit(limit);
+
+  if (cursor) request.cursor(cursor);
+
+  const effects = await request.call();
+
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const records = effects.records || [];
+  const nextCursor = records.length > 0 ? records[records.length - 1].paging_token : null;
+
+  const result = {
+    records,
+    nextCursor,
+    hasMore: records.length === limit && !!nextCursor,
+  };
+  stellarCache.set(cacheKey, result, TTL.OPERATIONS, ['effects', publicKey]);
+  return result;
+}
+
 // ─── Operation labels ───────────────────────────────────────────────────────────
 
 export const OPERATION_LABELS: Record<string, string> = {
@@ -1009,6 +1098,8 @@ export interface ContractSimulationResult {
     readOnly: SerializedLedgerKey[];
     readWrite: SerializedLedgerKey[];
     minResourceFee: string;
+    /** Budgeted Soroban resources from the simulated transaction data, when decodable. */
+    resources: { instructions: number; readBytes: number; writeBytes: number } | null;
   } | null;
 }
 
@@ -1029,6 +1120,26 @@ function serializeLedgerKey(key: StellarSdk.xdr.LedgerKey): SerializedLedgerKey 
     type: getLedgerKeyType(key),
     xdr: key.toXDR('base64'),
   };
+}
+
+/**
+ * Extracts the budgeted CPU instructions / read bytes / write bytes the simulation assigned to
+ * the transaction's Soroban resources. Decoding is best-effort: an SDK-shape change here should
+ * degrade to `null` (a "missing metric" upstream) rather than break simulation entirely.
+ */
+function readSorobanResources(
+  sorobanData: StellarSdk.SorobanDataBuilder
+): { instructions: number; readBytes: number; writeBytes: number } | null {
+  try {
+    const resources = sorobanData.build().resources();
+    return {
+      instructions: Number(resources.instructions()),
+      readBytes: Number(resources.readBytes()),
+      writeBytes: Number(resources.writeBytes()),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function serializeScVal(value: StellarSdk.xdr.ScVal): unknown {
@@ -1153,6 +1264,7 @@ export async function simulateContractCall(
         readOnly: successfulSimulation.transactionData.getReadOnly().map(serializeLedgerKey),
         readWrite: successfulSimulation.transactionData.getReadWrite().map(serializeLedgerKey),
         minResourceFee: successfulSimulation.minResourceFee,
+        resources: readSorobanResources(successfulSimulation.transactionData),
       }
     : null;
 

@@ -9,6 +9,7 @@
  */
 
 import React from 'react'
+import { vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -41,7 +42,7 @@ function makePage(
     id: `tx-${startIndex + i}`,
     paging_token: `cursor-${startIndex + i}`,
     hash: `hash-${startIndex + i}`,
-  })) as unknown as stellarLib.fetchTransactions extends (...args: any[]) => Promise<infer T>
+  })) as unknown as typeof stellarLib.fetchTransactions extends (...args: any[]) => Promise<infer T>
     ? T extends { records: infer R } ? R : never
     : never
 

@@ -56,6 +56,8 @@
         "analytics": "تحليلات",
         "systemHealth": "حالة النظام",
         "audit": "سجل التدقيق",
+        "bridgeMonitor": "مراقب الجسر",
+        "qaSystem": "نظام ضمان الجودة بالذكاء الاصطناعي",
         "compare": "مقارنة"
     },
     "connect": {

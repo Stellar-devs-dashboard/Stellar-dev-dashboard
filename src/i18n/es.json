@@ -56,6 +56,8 @@
         "analytics": "Analíticas",
         "systemHealth": "Salud del Sistema",
         "audit": "Registro de Auditoría",
+        "bridgeMonitor": "Monitor de puente",
+        "qaSystem": "Sistema de QA con IA",
         "compare": "Comparar"
     },
     "connect": {

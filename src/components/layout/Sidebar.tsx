@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
 
   { type: 'header', label: 'NETWORK' },
   { id: 'network', label: 'Network Info', icon: '◎' },
+  { id: 'compatibility', label: 'Compatibility', icon: '✓' },
   { id: 'networkIntelligence', label: 'Intelligence', icon: '◈' },
   { id: 'marketSentiment', label: 'Sentiment', icon: '◔' },
   { id: 'docAnalysis', label: 'Doc Analysis', icon: '❖' },
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
 
   { type: 'header', label: 'TESTING' },
   { id: 'contractTesting', label: 'Contract Testing', icon: '🧪' },
+  { id: 'resourceProfiling', label: 'Resource Profiling', icon: '📊' },
   { id: 'bridgeMonitor', label: 'Bridge Monitor', icon: '⇄' },
   { id: 'qaSystem', label: 'AI QA System', icon: '⚛' },
 
@@ -61,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'wallet', label: 'Wallet', icon: '⊡' },
   { id: 'signer', label: 'Signer', icon: '✎' },
   { id: 'outbox', label: 'Outbox', icon: '⇧' },
+  { id: 'bulkOperations', label: 'Bulk Operations', icon: '⧉' },
   { id: 'multisig', label: 'Multisig', icon: '⊕' },
   { id: 'governance', label: 'Governance', icon: '🏛' },
   { id: 'alertRules', label: 'Alerts', icon: '🔔' },
@@ -70,8 +73,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'behaviorInsights', label: 'Personalization', icon: '◌' },
   { id: 'recommendations', label: 'For You', icon: '✦' },
   { id: 'fraudDetection', label: 'Fraud Detection', icon: '🛡' },
+  { id: 'treasuryReconciliation', label: 'Treasury Reconciliation', icon: '📒' },
   { id: 'systemHealth', label: 'Health', icon: '⚕' },
+  { id: 'diagnostics', label: 'Diagnostics', icon: '◇' },
+  { id: 'ledgerSnapshots', label: 'Ledger Snapshots', icon: '📸' },
   { id: 'dataExport', label: 'Export', icon: '⬇' },
+  { id: 'translationReview', label: 'Translations', icon: '文' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
   { id: 'audit', label: 'Audit', icon: '⊟' },
 ];
