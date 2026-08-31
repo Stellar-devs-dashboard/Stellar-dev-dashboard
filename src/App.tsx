@@ -7,15 +7,13 @@ import React, {
   useRef,
   type ComponentType,
   type CSSProperties,
-} from 'react'
-import { Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { I18nProvider } from './components/I18nProvider'
-import './i18n/index'
+} from 'react';
+import { Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { I18nProvider } from './components/I18nProvider';
+import './i18n/index';
 import './styles/responsive.css';
 import './styles/mobile-performance.css';
 import { AccessibilityProvider } from './context/AccessibilityContext';
-
-
 
 import {
   isValidPublicKey,
@@ -23,68 +21,65 @@ import {
   fetchTransactions,
   fetchOperations,
   resolveAddress,
-} from './lib/stellar'
-import { stellarCacheManager } from './lib/cacheManager'
-import { getOnlineStatus } from './utils/offline'
-import Sidebar from './components/layout/Sidebar'
-import MobileHeader from './components/layout/MobileHeader'
-import MobileSidebar from './components/layout/MobileSidebar'
-import ConnectPanel from './components/dashboard/ConnectPanel'
-import PriceTicker from './components/dashboard/PriceTicker'
-import RealTimeNotificationCenter from './components/notifications/RealTimeNotificationCenter'
-import { useRealTimeNotifications } from './hooks/useRealTimeNotifications'
-import { pruneCaches } from './lib/cacheManager'
-import ErrorBoundary from './components/ErrorBoundary'
-import { useStore, type StoreState } from './lib/store'
-import { useResponsive } from './hooks/useResponsive'
-import { initializeErrorReporting, addBreadcrumb } from './lib/errorReporting'
+} from './lib/stellar';
+import { stellarCacheManager } from './lib/cacheManager';
+import { getOnlineStatus } from './utils/offline';
+import Sidebar from './components/layout/Sidebar';
+import MobileHeader from './components/layout/MobileHeader';
+import MobileSidebar from './components/layout/MobileSidebar';
+import ConnectPanel from './components/dashboard/ConnectPanel';
+import PriceTicker from './components/dashboard/PriceTicker';
+import RealTimeNotificationCenter from './components/notifications/RealTimeNotificationCenter';
+import { useRealTimeNotifications } from './hooks/useRealTimeNotifications';
+import { pruneCaches } from './lib/cacheManager';
+import ErrorBoundary from './components/ErrorBoundary';
+import { useStore, type StoreState } from './lib/store';
+import { useResponsive } from './hooks/useResponsive';
+import { initializeErrorReporting, addBreadcrumb } from './lib/errorReporting';
 import {
   installSecurityEventListeners,
   trackSecurityEvent,
   SecurityEventType,
-} from './lib/securityEvents'
-import { TourLauncher } from './components/tutorial'
-import SearchBar from './components/layout/SearchBar'
-import GlobalSearch from './components/search/GlobalSearch'
-import UserPreferences from './components/preferences/UserPreferences'
-import NetworkIndicator from './components/layout/NetworkIndicator'
-import MobileNavigation from './components/layout/MobileNavigation'
-import KeyboardNavigation from './components/accessibility/KeyboardNavigation'
-import ThemeToggle from './components/layout/ThemeToggle'
-import OfflineBanner from './components/layout/OfflineBanner'
-import PWAInstallBanner from './components/PWAInstallBanner'
-import { useSwipeGesture } from './hooks/useSwipeGesture'
-import { useBehaviorAnalytics } from './hooks/useBehaviorAnalytics'
-import AnalyticsConsentBanner from './components/analytics/AnalyticsConsentBanner'
+} from './lib/securityEvents';
+import { TourLauncher } from './components/tutorial';
+import SearchBar from './components/layout/SearchBar';
+import GlobalSearch from './components/search/GlobalSearch';
+import UserPreferences from './components/preferences/UserPreferences';
+import NetworkIndicator from './components/layout/NetworkIndicator';
+import MobileNavigation from './components/layout/MobileNavigation';
+import KeyboardNavigation from './components/accessibility/KeyboardNavigation';
+import ThemeToggle from './components/layout/ThemeToggle';
+import OfflineBanner from './components/layout/OfflineBanner';
+import PWAInstallBanner from './components/PWAInstallBanner';
+import { useSwipeGesture } from './hooks/useSwipeGesture';
+import { useBehaviorAnalytics } from './hooks/useBehaviorAnalytics';
+import AnalyticsConsentBanner from './components/analytics/AnalyticsConsentBanner';
 import TransactionOutbox, {
   TransactionOutboxBadge,
-} from './components/dashboard/TransactionOutbox'
-import { initializeTransactionOutbox } from './lib/transactionOutbox'
-import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { queryClient } from './lib/queryClient'
-import { diagnosticCollector } from './lib/diagnostics'
+} from './components/dashboard/TransactionOutbox';
+import { initializeTransactionOutbox } from './lib/transactionOutbox';
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/queryClient';
+import { diagnosticCollector } from './lib/diagnostics';
 
 interface SearchResult {
-  type?: string
+  type?: string;
 }
 
-type TabComponent = ComponentType<Record<string, unknown>>
+type TabComponent = ComponentType<Record<string, unknown>>;
 
 const lazyTab = (loader: () => Promise<{ default: TabComponent }>) =>
-  lazy(loader) as unknown as TabComponent
+  lazy(loader) as unknown as TabComponent;
 
-const lazyNamedTab = (
-  loader: () => Promise<Record<string, unknown>>,
-  exportName: string
-) =>
+const lazyNamedTab = (loader: () => Promise<Record<string, unknown>>, exportName: string) =>
   lazy(() =>
     loader().then((module) => ({
       default: module[exportName] as TabComponent,
     }))
-  ) as unknown as TabComponent
+  ) as unknown as TabComponent;
 
-const Overview = lazyTab(() => import('./components/dashboard/Overview'))
+const Overview = lazyTab(() => import('./components/dashboard/Overview'));
 
 const TABS: Record<string, TabComponent> = {
   overview: Overview,
@@ -116,7 +111,9 @@ const TABS: Record<string, TabComponent> = {
   behaviorInsights: lazyTab(() => import('./components/analytics/BehaviorAnalyticsDashboard')),
   recommendations: lazyTab(() => import('./components/recommendations/RecommendationDashboard')),
   systemHealth: lazyTab(() => import('./components/dashboard/SystemHealth')),
-  networkIntelligence: lazyTab(() => import('./components/network-intelligence/NetworkIntelligenceDashboard')),
+  networkIntelligence: lazyTab(
+    () => import('./components/network-intelligence/NetworkIntelligenceDashboard')
+  ),
   compatibility: lazyTab(() => import('./components/compatibility/CompatibilityDashboard')),
   marketSentiment: lazyTab(() => import('./components/market-sentiment/MarketSentimentDashboard')),
   docAnalysis: lazyTab(() => import('./components/doc-analysis/DocAnalysisDashboard')),
@@ -133,13 +130,25 @@ const TABS: Record<string, TabComponent> = {
   qaSystem: lazyTab(() => import('./components/dashboard/QASystem')),
   contractTesting: lazyTab(() => import('./components/contract-testing/ContractTestingDashboard')),
   fraudDetection: lazyTab(() => import('./components/fraud/FraudDetectionDashboard')),
-  treasuryReconciliation: lazyTab(() => import('./components/treasury/TreasuryReconciliationDashboard')),
+  treasuryReconciliation: lazyTab(
+    () => import('./components/treasury/TreasuryReconciliationDashboard')
+  ),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
   feeBumpStudio: lazyTab(() => import('./components/fee-bump-sponsorship/FeeBumpSponsorshipDashboard')),
-}
+  devopsAutomation: lazyTab(
+    () => import('./components/devops-automation/DevOpsAutomationDashboard')
+  ),
+};
 
-const PUBLIC_TABS = ['outbox', 'recommendations', 'contractTesting', 'resourceProfiling', 'diagnostics']
+const PUBLIC_TABS = [
+  'outbox',
+  'recommendations',
+  'contractTesting',
+  'resourceProfiling',
+  'diagnostics',
+  'devopsAutomation',
+];
 
 function TabLoadingFallback() {
   return (
@@ -153,7 +162,14 @@ function TabLoadingFallback() {
         gridTemplateRows: '32px 120px 1fr',
       }}
     >
-      <div style={{ width: '180px', height: '24px', borderRadius: '6px', background: 'var(--bg-elevated)' }} />
+      <div
+        style={{
+          width: '180px',
+          height: '24px',
+          borderRadius: '6px',
+          background: 'var(--bg-elevated)',
+        }}
+      />
       <div style={{ borderRadius: 'var(--radius-lg)', background: 'var(--bg-elevated)' }} />
       <div
         style={{
@@ -163,11 +179,17 @@ function TabLoadingFallback() {
         }}
       />
     </div>
-  )
+  );
 }
 
-function NotificationBell({ onClick, bottomOffset = '20px' }: { onClick: () => void; bottomOffset?: string }) {
-  const { unreadCount } = useRealTimeNotifications()
+function NotificationBell({
+  onClick,
+  bottomOffset = '20px',
+}: {
+  onClick: () => void;
+  bottomOffset?: string;
+}) {
+  const { unreadCount } = useRealTimeNotifications();
   return (
     <button
       type="button"
@@ -214,11 +236,11 @@ function NotificationBell({ onClick, bottomOffset = '20px' }: { onClick: () => v
         </span>
       )}
     </button>
-  )
+  );
 }
 
 function DashboardLayout() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const {
     connectedAddress,
     activeTab,
@@ -228,19 +250,19 @@ function DashboardLayout() {
     setActiveTab,
     preferencesOpen,
     setPreferencesOpen,
-  } = useStore()
-  const { isMobile, isTablet } = useResponsive()
-  const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false)
-  const { track: trackBehavior } = useBehaviorAnalytics()
+  } = useStore();
+  const { isMobile, isTablet } = useResponsive();
+  const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
+  const { track: trackBehavior } = useBehaviorAnalytics();
 
   useEffect(() => {
-    pruneCaches().catch(() => {})
-    return initializeTransactionOutbox()
-  }, [])
+    pruneCaches().catch(() => {});
+    return initializeTransactionOutbox();
+  }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     initializeErrorReporting({
@@ -248,68 +270,68 @@ function DashboardLayout() {
       maxErrorsPerSession: 100,
       batchSize: 5,
       flushInterval: 30000,
-    })
+    });
 
-    addBreadcrumb('Application initialized', 'info', { theme, isMobile })
-    installSecurityEventListeners()
-  }, [theme, isMobile])
+    addBreadcrumb('Application initialized', 'info', { theme, isMobile });
+    installSecurityEventListeners();
+  }, [theme, isMobile]);
 
   useEffect(() => {
     if (!isMobile && isMobileMenuOpen) {
-      setMobileMenuOpen(false)
+      setMobileMenuOpen(false);
     }
-  }, [isMobile, isMobileMenuOpen, setMobileMenuOpen])
+  }, [isMobile, isMobileMenuOpen, setMobileMenuOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMobileMenuOpen) {
-        setMobileMenuOpen(false)
-        addBreadcrumb('Mobile menu closed via escape key', 'user_action')
+        setMobileMenuOpen(false);
+        addBreadcrumb('Mobile menu closed via escape key', 'user_action');
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isMobileMenuOpen, setMobileMenuOpen])
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileMenuOpen, setMobileMenuOpen]);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
-      document.body.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = ''
+      document.body.style.overflow = '';
     }
 
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isMobileMenuOpen])
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
 
   useEffect(() => {
-    addBreadcrumb(`Mapsd to ${activeTab} tab`, 'navigation', { activeTab })
+    addBreadcrumb(`Mapsd to ${activeTab} tab`, 'navigation', { activeTab });
     diagnosticCollector.addBreadcrumb({
       action: 'dashboard.navigation',
       feature: activeTab,
       detail: { destination: activeTab },
-    })
+    });
     trackSecurityEvent(SecurityEventType.CONFIG_CHANGED, {
       target: 'activeTab',
       metadata: { activeTab },
-    })
+    });
     trackBehavior({
       type: 'navigation',
       name: `view:${activeTab}`,
       properties: { tab: activeTab, source: 'dashboard' },
-    })
-  }, [activeTab, trackBehavior])
+    });
+  }, [activeTab, trackBehavior]);
 
-  const ActiveComponent: TabComponent = TABS[activeTab] || Overview
+  const ActiveComponent: TabComponent = TABS[activeTab] || Overview;
 
   const getMainStyles = (): CSSProperties => {
     const baseStyles: CSSProperties = {
       flex: 1,
       width: '100%',
       transition: 'margin-left var(--transition), padding var(--transition)',
-    }
+    };
 
     if (isMobile) {
       return {
@@ -318,7 +340,7 @@ function DashboardLayout() {
         padding: 'var(--content-padding-mobile)',
         paddingTop: 'calc(var(--header-height) + var(--content-padding-mobile) + 16px)',
         maxWidth: '100%',
-      }
+      };
     }
 
     if (isTablet) {
@@ -328,7 +350,7 @@ function DashboardLayout() {
         padding: 'var(--content-padding-tablet)',
         paddingTop: 'calc(var(--content-padding-tablet) + 16px)',
         maxWidth: '1100px',
-      }
+      };
     }
 
     return {
@@ -337,35 +359,35 @@ function DashboardLayout() {
       padding: 'var(--content-padding)',
       paddingTop: 'calc(var(--content-padding) + 16px)',
       maxWidth: '1100px',
-    }
-  }
+    };
+  };
 
   const handleRetry = async (): Promise<void> => {
-    addBreadcrumb('App-level retry attempted', 'user_action')
-    window.location.reload()
-  }
+    addBreadcrumb('App-level retry attempted', 'user_action');
+    window.location.reload();
+  };
 
   const handleSearchResult = (result: SearchResult | null | undefined): void => {
-    if (!result) return
+    if (!result) return;
     if (result.type === 'transaction' || result.type === 'operation') {
-      navigate('/transactions')
-      return
+      navigate('/transactions');
+      return;
     }
     if (result.type === 'account') {
-      navigate('/account')
-      return
+      navigate('/account');
+      return;
     }
-    navigate('/overview')
-  }
+    navigate('/overview');
+  };
 
   // Swipe right from the left edge to open the mobile sidebar
   const swipeAreaRef = useSwipeGesture<HTMLElement>({
     onSwipeRight: useCallback(() => {
-      if (isMobile && !isMobileMenuOpen) setMobileMenuOpen(true)
+      if (isMobile && !isMobileMenuOpen) setMobileMenuOpen(true);
     }, [isMobile, isMobileMenuOpen, setMobileMenuOpen]),
     threshold: 40,
     restraint: 120,
-  })
+  });
 
   return (
     <ErrorBoundary onRetry={handleRetry} maxRetries={3}>
@@ -452,46 +474,48 @@ function DashboardLayout() {
               justifyContent: 'center',
               padding: '16px',
             }}
-            onClick={(e) => { if (e.target === e.currentTarget) setPreferencesOpen(false) }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPreferencesOpen(false);
+            }}
           >
             <UserPreferences onClose={() => setPreferencesOpen(false)} />
           </div>
         )}
       </div>
     </ErrorBoundary>
-  )
+  );
 }
 
 // ─── CopyLinkButton ──────────────────────────────────────────────────────────
 function CopyLinkButton() {
-  const { connectedAddress, network, activeTab } = useStore()
-  const [copied, setCopied] = useState(false)
+  const { connectedAddress, network, activeTab } = useStore();
+  const [copied, setCopied] = useState(false);
 
-  if (!connectedAddress) return null
+  if (!connectedAddress) return null;
 
   const handleCopy = async () => {
-    const url = new URL(window.location.href)
-    url.pathname = `/${activeTab}`
-    url.searchParams.set('address', connectedAddress)
-    url.searchParams.set('network', network)
+    const url = new URL(window.location.href);
+    url.pathname = `/${activeTab}`;
+    url.searchParams.set('address', connectedAddress);
+    url.searchParams.set('network', network);
     try {
-      await navigator.clipboard.writeText(url.toString())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(url.toString());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // fallback for browsers that block clipboard without https
-      const ta = document.createElement('textarea')
-      ta.value = url.toString()
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      const ta = document.createElement('textarea');
+      ta.value = url.toString();
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  }
+  };
 
   return (
     <button
@@ -516,28 +540,28 @@ function CopyLinkButton() {
       }}
       onMouseEnter={(e) => {
         if (!copied) {
-          e.currentTarget.style.color = 'var(--text-primary)'
-          e.currentTarget.style.background = 'var(--bg-hover)'
+          e.currentTarget.style.color = 'var(--text-primary)';
+          e.currentTarget.style.background = 'var(--bg-hover)';
         }
       }}
       onMouseLeave={(e) => {
         if (!copied) {
-          e.currentTarget.style.color = 'var(--text-secondary)'
-          e.currentTarget.style.background = 'var(--bg-elevated)'
+          e.currentTarget.style.color = 'var(--text-secondary)';
+          e.currentTarget.style.background = 'var(--bg-elevated)';
         }
       }}
     >
       {copied ? '✓' : '⎘'}
     </button>
-  )
+  );
 }
 
 // ─── RouterSync ───────────────────────────────────────────────────────────────
 function RouterSync() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const queryClient = useQueryClient()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const {
     connectedAddress,
     activeTab,
@@ -546,21 +570,21 @@ function RouterSync() {
     setNetwork,
     setConnectedAddress,
     setAccountData,
-  } = useStore()
+  } = useStore();
 
-  const pathTab = location.pathname === '/' ? 'overview' : location.pathname.slice(1)
+  const pathTab = location.pathname === '/' ? 'overview' : location.pathname.slice(1);
 
   // ── 1. On initial load, read ?address and ?network from URL ───────────────
-  const didAutoConnect = useRef(false)
+  const didAutoConnect = useRef(false);
   useEffect(() => {
-    if (didAutoConnect.current) return
-    didAutoConnect.current = true
+    if (didAutoConnect.current) return;
+    didAutoConnect.current = true;
 
-    const urlAddress = searchParams.get('address')
-    const urlNetwork = searchParams.get('network') as StoreState['network'] | null
+    const urlAddress = searchParams.get('address');
+    const urlNetwork = searchParams.get('network') as StoreState['network'] | null;
 
     if (urlNetwork && ['mainnet', 'testnet', 'futurenet', 'local', 'custom'].includes(urlNetwork)) {
-      if (urlNetwork !== network) setNetwork(urlNetwork)
+      if (urlNetwork !== network) setNetwork(urlNetwork);
     }
 
     if (urlAddress && isValidPublicKey(urlAddress) && !connectedAddress) {
@@ -568,103 +592,107 @@ function RouterSync() {
         urlNetwork && ['mainnet', 'testnet', 'futurenet', 'local', 'custom'].includes(urlNetwork)
           ? urlNetwork
           : network
-      ) as StoreState['network']
+      ) as StoreState['network'];
 
-      const controller = new AbortController()
-      const { signal } = controller
+      const controller = new AbortController();
+      const { signal } = controller;
 
-      import('./hooks/stellar/useAccount').then(({ fetchAccountWithFallback }) =>
-        fetchAccountWithFallback(urlAddress, targetNetwork, true, signal)
-      )
+      import('./hooks/stellar/useAccount')
+        .then(({ fetchAccountWithFallback }) =>
+          fetchAccountWithFallback(urlAddress, targetNetwork, true, signal)
+        )
         .then((result) => {
-          if (signal.aborted || !result) return
-          setConnectedAddress(result.resolvedAddress!)
-          setAccountData(result.account as Parameters<typeof setAccountData>[0])
+          if (signal.aborted || !result) return;
+          setConnectedAddress(result.resolvedAddress!);
+          setAccountData(result.account as Parameters<typeof setAccountData>[0]);
           // Seed query cache so the first tab renders instantly
-          queryClient.setQueryData(
-            ['account', result.resolvedAddress!, targetNetwork],
-            result,
-          )
-          if (TABS[pathTab]) setActiveTab(pathTab)
+          queryClient.setQueryData(['account', result.resolvedAddress!, targetNetwork], result);
+          if (TABS[pathTab]) setActiveTab(pathTab);
 
           // Background prefetch transactions + operations
-          const addr = result.resolvedAddress!
-          queryClient.prefetchInfiniteQuery({
-            queryKey: ['transactions', addr, targetNetwork, 'infinite', 50],
-            queryFn: ({ signal: s }) =>
-              import('./lib/stellar').then(({ fetchTransactions }) =>
-                fetchTransactions(addr, targetNetwork, 50, null, s),
-              ),
-            initialPageParam: null,
-          }).catch(() => {})
-          queryClient.prefetchInfiniteQuery({
-            queryKey: ['operations', addr, targetNetwork, 'infinite', 50],
-            queryFn: ({ signal: s }) =>
-              import('./lib/stellar').then(({ fetchOperations }) =>
-                fetchOperations(addr, targetNetwork, 50, null, s),
-              ),
-            initialPageParam: null,
-          }).catch(() => {})
+          const addr = result.resolvedAddress!;
+          queryClient
+            .prefetchInfiniteQuery({
+              queryKey: ['transactions', addr, targetNetwork, 'infinite', 50],
+              queryFn: ({ signal: s }) =>
+                import('./lib/stellar').then(({ fetchTransactions }) =>
+                  fetchTransactions(addr, targetNetwork, 50, null, s)
+                ),
+              initialPageParam: null,
+            })
+            .catch(() => {});
+          queryClient
+            .prefetchInfiniteQuery({
+              queryKey: ['operations', addr, targetNetwork, 'infinite', 50],
+              queryFn: ({ signal: s }) =>
+                import('./lib/stellar').then(({ fetchOperations }) =>
+                  fetchOperations(addr, targetNetwork, 50, null, s)
+                ),
+              initialPageParam: null,
+            })
+            .catch(() => {});
         })
-        .catch(() => { /* URL had an invalid/unfunded address — stay on connect screen */ })
+        .catch(() => {
+          /* URL had an invalid/unfunded address — stay on connect screen */
+        });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── 2. Path → tab: when browser navigates (back/forward or direct URL), update store ──
   useEffect(() => {
-    if (pathTab === 'connect') return
+    if (pathTab === 'connect') return;
     if (TABS[pathTab] && pathTab !== activeTab) {
-      setActiveTab(pathTab)
+      setActiveTab(pathTab);
     }
-  }, [location.pathname])
+  }, [location.pathname]);
 
   // ── 3. Tab → path: when setActiveTab() is called directly (e.g. ConnectPanel
   //    sets 'overview' after connecting), push the matching path into history.
   //    Skip if the path already matches, or if it maps to a different known tab
   //    (meaning the user navigated via the sidebar — let effect 2 own that).
   useEffect(() => {
-    if (!connectedAddress && !PUBLIC_TABS.includes(activeTab)) return
-    if (!TABS[activeTab]) return
-    const expectedPath = `/${activeTab}`
+    if (!connectedAddress && !PUBLIC_TABS.includes(activeTab)) return;
+    if (!TABS[activeTab]) return;
+    const expectedPath = `/${activeTab}`;
     if (location.pathname !== expectedPath && !TABS[pathTab]) {
-      const params = new URLSearchParams(searchParams)
-      navigate({ pathname: expectedPath, search: params.toString() }, { replace: false })
+      const params = new URLSearchParams(searchParams);
+      navigate({ pathname: expectedPath, search: params.toString() }, { replace: false });
     }
-  }, [activeTab])
+  }, [activeTab]);
 
   // ── 4. Redirect guard: no address → /connect, has address → away from /connect ──
   useEffect(() => {
     if (!connectedAddress && pathTab !== 'connect' && !PUBLIC_TABS.includes(pathTab)) {
-      navigate('/connect', { replace: true })
+      navigate('/connect', { replace: true });
     } else if (connectedAddress && pathTab === 'connect') {
-      const params = new URLSearchParams(searchParams)
-      navigate({ pathname: `/${activeTab}`, search: params.toString() }, { replace: true })
+      const params = new URLSearchParams(searchParams);
+      navigate({ pathname: `/${activeTab}`, search: params.toString() }, { replace: true });
     }
-  }, [connectedAddress, location.pathname])
+  }, [connectedAddress, location.pathname]);
 
   // ── 5. Keep ?address and ?network in URL in sync with store state ─────────
   useEffect(() => {
-    if (!connectedAddress) return
-    const currentAddress = searchParams.get('address')
-    const currentNetwork = searchParams.get('network')
+    if (!connectedAddress) return;
+    const currentAddress = searchParams.get('address');
+    const currentNetwork = searchParams.get('network');
     if (currentAddress !== connectedAddress || currentNetwork !== network) {
       setSearchParams(
         (prev) => {
-          const next = new URLSearchParams(prev)
-          next.set('address', connectedAddress)
-          next.set('network', network)
-          return next
+          const next = new URLSearchParams(prev);
+          next.set('address', connectedAddress);
+          next.set('network', network);
+          return next;
         },
-        { replace: false },
-      )
+        { replace: false }
+      );
     }
-  // searchParams intentionally omitted: we only want this to run when address/network change,
-  // not on every searchParams object reference update (which would cause an infinite loop)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectedAddress, network])
+    // searchParams intentionally omitted: we only want this to run when address/network change,
+    // not on every searchParams object reference update (which would cause an infinite loop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedAddress, network]);
 
-  return null
+  return null;
 }
 
 export default function App() {
@@ -683,5 +711,5 @@ export default function App() {
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
       )}
     </QueryClientProvider>
-  )
+  );
 }
