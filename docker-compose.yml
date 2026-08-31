@@ -4,12 +4,12 @@ services:
       context: .
       target: production
     ports:
-      - "8080:80"
+      - '8080:80'
     environment:
       - NODE_ENV=production
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost/health']
       interval: 30s
       timeout: 3s
       retries: 3
@@ -18,12 +18,12 @@ services:
     build:
       context: ./services/bridge-monitor
     ports:
-      - "3099:3099"
+      - '3099:3099'
     environment:
       - PORT=3099
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3099/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3099/health']
       interval: 30s
       timeout: 3s
       retries: 3
@@ -32,7 +32,7 @@ services:
     build:
       context: ./services/behavior-analytics
     ports:
-      - "3101:3101"
+      - '3101:3101'
     environment:
       - NODE_ENV=development
       - PORT=3101
@@ -41,7 +41,7 @@ services:
       - ANALYTICS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3101/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3101/health']
       interval: 30s
       timeout: 3s
       retries: 3
@@ -53,7 +53,7 @@ services:
       - .:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
+      - '5173:5173'
     command: npm run dev -- --host
     environment:
       - NODE_ENV=development
@@ -64,7 +64,7 @@ services:
       context: .
       dockerfile: services/network-monitor/Dockerfile
     ports:
-      - "8787:8787"
+      - '8787:8787'
     environment:
       - MONITOR_ALLOWED_ORIGIN=http://localhost:5173
       - MONITOR_API_KEY=${MONITOR_API_KEY:-}
@@ -76,7 +76,7 @@ services:
       context: .
       dockerfile: services/sentiment-analysis/Dockerfile
     ports:
-      - "8790:8790"
+      - '8790:8790'
     environment:
       - SENTIMENT_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
       - SENTIMENT_API_KEY=${SENTIMENT_API_KEY:-}
@@ -88,7 +88,7 @@ services:
       context: .
       dockerfile: services/fraud-detection/Dockerfile
     ports:
-      - "8791:8791"
+      - '8791:8791'
     environment:
       - FRAUD_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
       - FRAUD_API_KEY=${FRAUD_API_KEY:-}
@@ -100,14 +100,28 @@ services:
       context: .
       dockerfile: services/contract-testing/Dockerfile
     ports:
-      - "8793:8793"
+      - '8793:8793'
     environment:
       - CONTRACT_TESTING_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
       - CONTRACT_TESTING_API_KEY=${CONTRACT_TESTING_API_KEY:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8793/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8793/health']
       interval: 30s
       timeout: 3s
       retries: 3
     profiles: [testing]
+
+  devops-automation:
+    build:
+      context: ./services/devops-automation
+    ports:
+      - '3009:3009'
+    environment:
+      - PORT=3009
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3009/health']
+      interval: 30s
+      timeout: 3s
+      retries: 3
