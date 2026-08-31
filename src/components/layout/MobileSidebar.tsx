@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "compatibility", label: "Compatibility", icon: "✓" },
   { id: "realtime", label: "Real-Time", icon: "◉" },
   { id: "builder", label: "Builder", icon: "⚒" },
+  { id: "feeBumpStudio", label: "Fee-Bump Studio", icon: "⚡" },
   { id: "faucet", label: "Faucet", icon: "⬡" },
   { id: "wallet", label: "Wallet", icon: "⊡" },
   { id: "signer", label: "Signer", icon: "✎" },

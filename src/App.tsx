@@ -135,6 +135,7 @@ const TABS: Record<string, TabComponent> = {
   ),
   diagnostics: lazyTab(() => import('./components/diagnostics/DiagnosticsDashboard')),
   ledgerSnapshots: lazyTab(() => import('./components/ledger-snapshots/LedgerSnapshotDashboard')),
+  feeBumpStudio: lazyTab(() => import('./components/fee-bump-sponsorship/FeeBumpSponsorshipDashboard')),
   devopsAutomation: lazyTab(
     () => import('./components/devops-automation/DevOpsAutomationDashboard')
   ),
