@@ -36,6 +36,7 @@
     "test:fraud-service": "node --test services/fraud-detection/server.test.mjs",
     "test:recommendation-service": "node --test services/recommendation-engine/server.test.mjs",
     "test:contract-testing-service": "node --test services/contract-testing/server.test.mjs",
+    "test:devops-service": "node --test services/devops-automation/server.test.mjs",
     "load:test:analytics": "k6 run services/behavior-analytics/load/k6.js",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
@@ -43,7 +44,8 @@
     "sentiment:service": "node services/sentiment-analysis/server.mjs",
     "fraud:service": "node services/fraud-detection/server.mjs",
     "recommendation:service": "node services/recommendation-engine/server.mjs",
-    "contract-testing:service": "node services/contract-testing/server.mjs"
+    "contract-testing:service": "node services/contract-testing/server.mjs",
+    "devops:service": "node services/devops-automation/server.mjs"
   },
   "dependencies": {
     "@axe-core/react": "^4.11.3",

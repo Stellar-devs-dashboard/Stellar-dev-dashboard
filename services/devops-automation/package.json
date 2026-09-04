@@ -1,0 +1,13 @@
+{
+  "name": "devops-automation-service",
+  "version": "1.0.0",
+  "description": "AI-powered DevOps and infrastructure automation microservice for Stellar Dev Dashboard",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test server.test.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
