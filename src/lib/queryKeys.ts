@@ -97,3 +97,21 @@ export const faucetKeys = {
   fund: (address: string, network: NetworkName) =>
     ['faucet', address, network] as const,
 }
+
+// ─── Asset Control ────────────────────────────────────────────────────────────
+
+export const assetControlKeys = {
+  all: ['assetControl'] as const,
+  /** Issuer readiness for a given address + network. */
+  issuerReadiness: (address: string, network: NetworkName) =>
+    ['assetControl', 'issuerReadiness', address, network] as const,
+  /** Issuer state (flags, signers, reserves). */
+  issuerState: (address: string, network: NetworkName) =>
+    ['assetControl', 'issuerState', address, network] as const,
+  /** Holders of a specific asset. */
+  holders: (assetCode: string, issuer: string, network: NetworkName) =>
+    ['assetControl', 'holders', assetCode, issuer, network] as const,
+  /** Trustline detail for one holder. */
+  trustline: (holder: string, assetCode: string, issuer: string, network: NetworkName) =>
+    ['assetControl', 'trustline', holder, assetCode, issuer, network] as const,
+}
