@@ -17,9 +17,24 @@ import {
   flattenTransactionPages,
   flattenOperationPages,
 } from '../../hooks/stellar'
+import EnhancedTable, { type TableDensity } from '../common/EnhancedTable'
+import { useTablePresets } from '../../hooks/useTablePresets'
 
 const VIRTUAL_SCROLL_THRESHOLD = 200
 const PAGE_SIZE = 100
+
+const TRANSACTION_COLUMNS = [
+  { id: 'hash', label: 'Hash', width: '2fr' },
+  { id: 'ops', label: 'Ops / Time', width: '1fr' },
+  { id: 'fee', label: 'Fee', width: '1fr' },
+  { id: 'source', label: 'Source', width: '2fr' },
+]
+
+const OPERATION_COLUMNS = [
+  { id: 'type', label: 'Type / Details', width: '2fr' },
+  { id: 'time', label: 'Time', width: '1fr' },
+  { id: 'accounts', label: 'Accounts', width: '2fr' },
+]
 
 function LoadingRows({ count, height }: { count: number; height: number }) {
   return (
@@ -119,6 +134,16 @@ export default function Transactions() {
     applySavedSearch,
   } = useSearch()
   const { preferences } = usePreferences()
+
+  // Table presets for transactions
+  const txPresets = useTablePresets('transactions')
+  const [txVisibleColumns, setTxVisibleColumns] = useState(['hash', 'ops', 'fee', 'source'])
+  const [txDensity, setTxDensity] = useState<TableDensity>('comfortable')
+
+  // Table presets for operations
+  const opPresets = useTablePresets('operations')
+  const [opVisibleColumns, setOpVisibleColumns] = useState(['type', 'time', 'accounts'])
+  const [opDensity, setOpDensity] = useState<TableDensity>('comfortable')
 
   // ── React Query data ──────────────────────────────────────────────────────
   const {
@@ -374,13 +399,19 @@ export default function Transactions() {
       </div>
 
       {view === 'transactions' && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          {/* Column headers */}
-          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            <span>Hash</span>
-            <span>Ops / Time</span>
-          </div>
-
+        <EnhancedTable
+          columns={TRANSACTION_COLUMNS}
+          visibleColumns={txVisibleColumns}
+          onVisibleColumnsChange={setTxVisibleColumns}
+          density={txDensity}
+          onDensityChange={setTxDensity}
+          presets={txPresets.presets}
+          onPresetSave={txPresets.onPresetSave}
+          onPresetDelete={txPresets.onPresetDelete}
+          onPresetApply={txPresets.onPresetApply}
+          stickyHeader={true}
+          maxHeight="600px"
+        >
           {txLoading ? (
             <LoadingRows count={8} height={TX_ROW_HEIGHT} />
           ) : filteredTransactions.length === 0 ? (
@@ -397,19 +428,28 @@ export default function Transactions() {
               initialScrollTop={txScrollPosition}
               onScrollPositionChange={setTxScrollPosition}
               addressLabels={addressLabels}
+              density={txDensity}
+              visibleColumns={txVisibleColumns}
             />
           )}
-        </div>
+        </EnhancedTable>
       )}
 
       {/* Operations panel */}
       {view === 'operations' && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            <span>Type / Details</span>
-            <span>Time</span>
-          </div>
-
+        <EnhancedTable
+          columns={OPERATION_COLUMNS}
+          visibleColumns={opVisibleColumns}
+          onVisibleColumnsChange={setOpVisibleColumns}
+          density={opDensity}
+          onDensityChange={setOpDensity}
+          presets={opPresets.presets}
+          onPresetSave={opPresets.onPresetSave}
+          onPresetDelete={opPresets.onPresetDelete}
+          onPresetApply={opPresets.onPresetApply}
+          stickyHeader={true}
+          maxHeight="600px"
+        >
           {opsLoading ? (
             <LoadingRows count={8} height={OP_ROW_HEIGHT} />
           ) : filteredOperations.length === 0 ? (
@@ -426,9 +466,11 @@ export default function Transactions() {
               initialScrollTop={opsScrollPosition}
               onScrollPositionChange={setOpsScrollPosition}
               addressLabels={addressLabels}
+              density={opDensity}
+              visibleColumns={opVisibleColumns}
             />
           )}
-        </div>
+        </EnhancedTable>
       )}
 
       {/* Keyframe animation for spinner — injected once */}

@@ -4,6 +4,8 @@ Privacy-preserving usage insights and on-device personalization are documented i
 
 Explainable hybrid ecosystem recommendations, privacy controls, and the optional ranking API are documented in [docs/recommendations.md](docs/recommendations.md).
 
+2026 UX improvements including sticky headers, print-optimized views, biometric authentication, and offline documentation caching are documented in [docs/FEATURE_IMPLEMENTATION.md](docs/FEATURE_IMPLEMENTATION.md).
+
 A real-time, open-source developer dashboard for the Stellar network — built with Vite and React.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-cyan.svg)

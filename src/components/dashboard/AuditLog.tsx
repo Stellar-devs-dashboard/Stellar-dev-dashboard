@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, type MouseEvent, type ReactNode } from 'react';
 import { useStore } from '../../lib/store';
 import { formatDistanceToNow } from 'date-fns';
+import { Printer } from 'lucide-react';
 import Card from './Card';
 import type { AuditEntry } from '../../utils/audit';
 
@@ -286,6 +287,10 @@ export default function AuditLog() {
   const [filters, setFilters] = useState<FilterState>({ severity: [], category: [], search: '' });
   const listRef = useRef<HTMLDivElement>(null);
 
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
   useEffect(() => {
     async function fetchLogs() {
       setIsLoading(true);
@@ -320,13 +325,39 @@ export default function AuditLog() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>
-          Audit Log
+      <div className="print-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>
+            Audit Log
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+            Track and review actions across the dashboard with full search and filtering.
+          </p>
         </div>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
-          Track and review actions across the dashboard with full search and filtering.
-        </p>
+        <button
+          onClick={handlePrint}
+          className="no-print"
+          style={{
+            padding: '8px 12px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-secondary)',
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'var(--transition)',
+          }}
+        >
+          <Printer size={14} />
+          <span>Print</span>
+        </button>
+      </div>
+
+      <div className="print-only" style={{ fontSize: '10pt', color: '#666', marginBottom: '10px' }}>
+        Generated on {new Date().toLocaleString()} | Network: {network}
       </div>
 
       <FilterBar onFilterChange={(f: FilterState) => setFilters(f)} />

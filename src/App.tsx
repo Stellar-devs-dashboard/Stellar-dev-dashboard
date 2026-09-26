@@ -120,6 +120,7 @@ const TABS: Record<string, TabComponent> = {
   performance: lazyTab(() => import('./components/dashboard/PerformanceMonitor')),
   settings: lazyTab(() => import('./components/dashboard/Settings')),
   audit: lazyTab(() => import('./components/dashboard/AuditLog')),
+  compliance: lazyTab(() => import('./components/dashboard/ComplianceDashboard')),
   anchors: lazyNamedTab(() => import('./components/anchors'), 'AnchorIntegration'),
   search: lazyTab(() => import('./components/dashboard/AdvancedSearch')),
   cacheStats: lazyTab(() => import('./components/dashboard/CacheStats')),
@@ -147,6 +148,7 @@ const PUBLIC_TABS = [
   'resourceProfiling',
   'diagnostics',
   'devopsAutomation',
+  'compliance',
 ];
 
 function TabLoadingFallback() {

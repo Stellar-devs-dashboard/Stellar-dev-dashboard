@@ -1,0 +1,121 @@
+import { renderHook, act } from '@testing-library/react';
+import { useDocsCache } from '../useDocsCache';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+describe('useDocsCache', () => {
+  const mockCacheName = 'stellar-docs-v1';
+
+  beforeEach(() => {
+    // Mock caches API
+    (global as any).caches = {
+      open: vi.fn().mockResolvedValue({
+        keys: vi.fn().mockResolvedValue([]),
+        match: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(true),
+      }),
+      delete: vi.fn().mockResolvedValue(true),
+      keys: vi.fn().mockResolvedValue([]),
+    };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should initialize with no cached docs', () => {
+    const { result } = renderHook(() => useDocsCache());
+
+    expect(result.current.isCached).toBe(false);
+    expect(result.current.isUpdating).toBe(false);
+    expect(result.current.lastUpdated).toBeNull();
+    expect(result.current.cachedDocs).toEqual([]);
+  });
+
+  it('should check cache status on mount', async () => {
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      await result.current.checkCacheStatus();
+    });
+
+    expect((global as any).caches.open).toHaveBeenCalledWith(mockCacheName);
+  });
+
+  it('should cache documentation URLs', async () => {
+    const mockCache = {
+      keys: vi.fn().mockResolvedValue([]),
+      match: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    (global as any).caches.open = vi.fn().mockResolvedValue(mockCache);
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers(),
+      body: new ReadableStream(),
+    });
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      const success = await result.current.cacheDocs(['/docs/test']);
+      expect(success).toBe(true);
+    });
+
+    expect(mockCache.put).toHaveBeenCalled();
+  });
+
+  it('should handle cache errors gracefully', async () => {
+    (global as any).caches.open = vi.fn().mockRejectedValue(new Error('Cache error'));
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      await result.current.checkCacheStatus();
+    });
+
+    expect(result.current.error).toBe('Failed to check cache status');
+  });
+
+  it('should clear docs cache', async () => {
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      const success = await result.current.clearDocsCache();
+      expect(success).toBe(true);
+    });
+
+    expect((global as any).caches.delete).toHaveBeenCalledWith(mockCacheName);
+  });
+
+  it('should check if specific doc is cached', async () => {
+    const mockCache = {
+      keys: vi.fn().mockResolvedValue([]),
+      match: vi.fn().mockResolvedValue({ ok: true }),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    (global as any).caches.open = vi.fn().mockResolvedValue(mockCache);
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      const isCached = await result.current.isDocCached('/docs/test');
+      expect(isCached).toBe(true);
+    });
+
+    expect(mockCache.match).toHaveBeenCalledWith('/docs/test');
+  });
+
+  it('should return null when cache API is not available', async () => {
+    (global as any).caches = undefined;
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      const cached = await result.current.getCachedDoc('/docs/test');
+      expect(cached).toBeNull();
+    });
+
+    expect(result.current.error).toBe('Cache API not available');
+  });
+});
