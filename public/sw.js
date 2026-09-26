@@ -5,6 +5,7 @@
  */
 
 const CACHE_NAME = 'stellar-shell-v1';
+const DOCS_CACHE_NAME = 'stellar-docs-v1';
 const OUTBOX_DB_NAME = 'stellar-transaction-outbox';
 const OUTBOX_DB_VERSION = 1;
 const OUTBOX_STORE_NAME = 'transactions';
@@ -16,6 +17,20 @@ const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+];
+
+// Critical documentation pages to cache for offline reference
+const DOCS_ASSETS = [
+  '/docs/getting-started',
+  '/docs/api-reference',
+  '/docs/soroban',
+  '/docs/horizon',
+  '/docs/transactions',
+  '/docs/operations',
+  '/docs/assets',
+  '/docs/contracts',
+  '/docs/offline',
+  '/docs/security',
 ];
 
 // URL prefixes that should NEVER be cached (live network data)
@@ -31,13 +46,18 @@ function isNetworkOnly(url) {
   return NETWORK_ONLY_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
+// Check if URL is a documentation page
+function isDocsUrl(url) {
+  return url.includes('/docs/') || DOCS_ASSETS.some((doc) => url.includes(doc));
+}
+
 // ─── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting()) // activate immediately
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)),
+      caches.open(DOCS_CACHE_NAME).then((cache) => cache.addAll(DOCS_ASSETS)),
+    ]).then(() => self.skipWaiting()) // activate immediately
   );
 });
 
@@ -49,7 +69,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_NAME)
+            .filter((key) => key !== CACHE_NAME && key !== DOCS_CACHE_NAME)
             .map((key) => caches.delete(key))
         )
       )
@@ -65,8 +85,8 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (request.method !== 'GET') return;
 
-  // Skip cross-origin requests that aren't part of the shell
-  if (!url.startsWith(self.location.origin) && !isNetworkOnly(url) === false) {
+  // Skip cross-origin requests that aren't part of the shell or docs
+  if (!url.startsWith(self.location.origin) && !isNetworkOnly(url)) {
     return;
   }
 
@@ -90,7 +110,9 @@ self.addEventListener('fetch', (event) => {
               url.startsWith('https://fonts.'))
           ) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            // Cache docs in docs cache, everything else in shell cache
+            const cacheName = isDocsUrl(url) ? DOCS_CACHE_NAME : CACHE_NAME;
+            caches.open(cacheName).then((cache) => cache.put(request, clone));
           }
           return response;
         })
@@ -98,6 +120,10 @@ self.addEventListener('fetch', (event) => {
           // Offline fallback: serve index.html for navigation requests
           if (request.mode === 'navigate') {
             return caches.match('/index.html');
+          }
+          // Try to serve from docs cache for documentation pages
+          if (isDocsUrl(url)) {
+            return caches.open(DOCS_CACHE_NAME).then((cache) => cache.match(request));
           }
         });
     })

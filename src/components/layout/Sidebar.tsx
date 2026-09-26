@@ -86,6 +86,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'translationReview', label: 'Translations', icon: '文' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
   { id: 'audit', label: 'Audit', icon: '⊟' },
+  { id: 'compliance', label: 'Compliance', icon: '⚖' },
 ];
 
 export interface SidebarProps {

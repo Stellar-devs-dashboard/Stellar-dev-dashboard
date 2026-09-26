@@ -1,0 +1,240 @@
+/**
+ * Print-optimized styles for compliance and audit pages
+ */
+
+@media print {
+  /* Hide non-essential elements */
+  .no-print,
+  button,
+  input[type="text"],
+  input[type="search"],
+  select,
+  .sidebar,
+  .mobile-header,
+  .mobile-navigation,
+  .notification-bell,
+  .theme-toggle,
+  .copy-link-button,
+  .filters-button,
+  .density-toggle,
+  .column-toggle,
+  .preset-toggle,
+  .virtual-list-scroll {
+    display: none !important;
+  }
+
+  /* Reset body for print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  /* Print-friendly card styles */
+  .card,
+  [style*="background: var(--bg-card)"],
+  [style*="background: var(--bg-elevated)"] {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Print-friendly table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Sticky headers become regular headers in print */
+  [style*="position: sticky"] {
+    position: static !important;
+  }
+
+  /* Ensure text is readable */
+  [style*="color: var(--text-primary)"],
+  [style*="color: var(--text-secondary)"],
+  [style*="color: var(--text-muted)"] {
+    color: black !important;
+  }
+
+  /* Borders become solid black */
+  [style*="border: 1px solid var(--border)"],
+  [style*="border: 1px solid var(--border-bright)"] {
+    border: 1px solid #000 !important;
+  }
+
+  /* Background colors become white or light gray */
+  [style*="background: var(--bg-hover)"],
+  [style*="background: var(--bg-canvas)"],
+  [style*="background: var(--cyan-glow-sm)"],
+  [style*="background: var(--bg-elevated)"] {
+    background: #f5f5f5 !important;
+  }
+
+  /* Accent colors become grayscale */
+  [style*="color: var(--cyan)"],
+  [style*="color: var(--cyan-dim)"] {
+    color: #0066cc !important;
+  }
+
+  [style*="color: var(--green)"] {
+    color: #006600 !important;
+  }
+
+  [style*="color: var(--red)"] {
+    color: #cc0000 !important;
+  }
+
+  [style*="color: var(--amber)"] {
+    color: #996600 !important;
+  }
+
+  /* Remove shadows and transitions */
+  * {
+    box-shadow: none !important;
+    transition: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure links are visible */
+  a {
+    color: #0066cc !important;
+    text-decoration: underline;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+  }
+
+  /* Code blocks */
+  pre,
+  code {
+    background: #f5f5f5 !important;
+    border: 1px solid #ccc !important;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Audit log specific styles */
+  .audit-log-entry {
+    page-break-inside: avoid;
+    border-bottom: 1px solid #ccc;
+    padding: 8px 0;
+  }
+
+  .audit-log-header {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .audit-log-details {
+    font-size: 10pt;
+    color: #333;
+  }
+
+  /* Compliance dashboard specific styles */
+  .compliance-section {
+    page-break-before: always;
+  }
+
+  .compliance-section:first-child {
+    page-break-before: avoid;
+  }
+
+  .compliance-metric {
+    border: 1px solid #ccc;
+    padding: 8px;
+    margin: 4px 0;
+    page-break-inside: avoid;
+  }
+
+  /* Print header and footer */
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  @page :first {
+    margin-top: 2cm;
+  }
+
+  /* Ensure images and charts print properly */
+  img,
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Expand collapsed content for print */
+  details[open] summary {
+    display: none;
+  }
+
+  details > * {
+    display: block !important;
+  }
+
+  /* Print-specific metadata */
+  .print-header {
+    display: block !important;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+
+  .print-footer {
+    display: block !important;
+    border-top: 1px solid #ccc;
+    padding-top: 10px;
+    margin-top: 20px;
+    font-size: 10pt;
+    color: #666;
+  }
+
+  .print-timestamp {
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Ensure virtual lists render all items */
+  .virtual-list-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .virtual-list-item {
+    display: block !important;
+    height: auto !important;
+  }
+}
+
+/* Print-specific classes that can be added to elements */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+}

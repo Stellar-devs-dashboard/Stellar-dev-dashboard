@@ -10,6 +10,7 @@ import {
   type StorageDurability,
   type StorageEntry,
 } from '../../lib/contractStorage';
+import type { TableDensity } from '../common/EnhancedTable';
 
 export const TX_ROW_HEIGHT = 86;
 export const OP_ROW_HEIGHT = 74;
@@ -25,6 +26,8 @@ interface VirtualTxListProps {
   initialScrollTop?: number;
   onScrollPositionChange?: (scrollTop: number) => void;
   addressLabels?: Record<string, string>;
+  density?: TableDensity;
+  visibleColumns?: string[];
 }
 
 interface VirtualOpListProps {
@@ -36,6 +39,8 @@ interface VirtualOpListProps {
   initialScrollTop?: number;
   onScrollPositionChange?: (scrollTop: number) => void;
   addressLabels?: Record<string, string>;
+  density?: TableDensity;
+  visibleColumns?: string[];
 }
 
 export const VirtualTxList = ({
@@ -47,9 +52,28 @@ export const VirtualTxList = ({
   initialScrollTop = 0,
   onScrollPositionChange,
   addressLabels = {},
+  density = 'comfortable',
+  visibleColumns = ['hash', 'ops', 'fee', 'source'],
 }: VirtualTxListProps) => {
   const rowHeight = (_index: number, item: Horizon.ServerApi.TransactionRecord) => {
-    return item.memo ? TX_ROW_HEIGHT + 20 : TX_ROW_HEIGHT;
+    const baseHeight = density === 'compact' ? TX_ROW_HEIGHT - 20 : density === 'spacious' ? TX_ROW_HEIGHT + 20 : TX_ROW_HEIGHT;
+    return item.memo ? baseHeight + 20 : baseHeight;
+  };
+
+  const getPadding = () => {
+    switch (density) {
+      case 'compact': return '8px 12px';
+      case 'spacious': return '16px 24px';
+      default: return '12px 18px';
+    }
+  };
+
+  const getFontSize = () => {
+    switch (density) {
+      case 'compact': return '11px';
+      case 'spacious': return '13px';
+      default: return '12px';
+    }
   };
 
   return (
@@ -66,10 +90,16 @@ export const VirtualTxList = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr auto',
+            gridTemplateColumns: visibleColumns.map(col => {
+              if (col === 'hash') return '2fr';
+              if (col === 'ops') return '1fr';
+              if (col === 'fee') return '1fr';
+              if (col === 'source') return '2fr';
+              return '1fr';
+            }).join(' '),
             gap: '12px',
             alignItems: 'center',
-            padding: '12px 18px',
+            padding: getPadding(),
             borderBottom: '1px solid var(--border)',
             transition: 'var(--transition)',
             height: '100%',
@@ -78,76 +108,85 @@ export const VirtualTxList = ({
           onMouseEnter={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'var(--bg-hover)')}
           onMouseLeave={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = isFocused ? 'var(--bg-hover)' : 'transparent')}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-              <span
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: tx.successful ? 'var(--green)' : 'var(--red)',
-                  flexShrink: 0,
-                  display: 'inline-block',
-                }}
-              />
-              <CopyableValue
-                value={tx.hash}
-                title="Copy transaction hash"
-                containerStyle={{
-                  fontSize: '12px',
-                  color: 'var(--cyan)',
-                  fontFamily: 'var(--font-mono)',
-                  minWidth: 0,
-                  flex: 1,
-                }}
-                textStyle={{
-                  display: 'inline-block',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '100%',
-                }}
-              >
-                {tx.hash}
-              </CopyableValue>
-              <a
-                href={`https://stellar.expert/explorer/${network}/tx/${tx.hash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: '11px', color: 'var(--cyan)', flexShrink: 0 }}
-              >
-                Open
-              </a>
-            </div>
-            {tx.memo && (
-              <div style={{ fontSize: '11px', color: 'var(--amber)', marginLeft: '15px', marginBottom: '2px' }}>
-                memo: {tx.memo as string}
+          {visibleColumns.includes('hash') && (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: tx.successful ? 'var(--green)' : 'var(--red)',
+                    flexShrink: 0,
+                    display: 'inline-block',
+                  }}
+                />
+                <CopyableValue
+                  value={tx.hash}
+                  title="Copy transaction hash"
+                  containerStyle={{
+                    fontSize: getFontSize(),
+                    color: 'var(--cyan)',
+                    fontFamily: 'var(--font-mono)',
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                  textStyle={{
+                    display: 'inline-block',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {tx.hash}
+                </CopyableValue>
+                <a
+                  href={`https://stellar.expert/explorer/${network}/tx/${tx.hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: getFontSize(), color: 'var(--cyan)', flexShrink: 0 }}
+                >
+                  Open
+                </a>
               </div>
-            )}
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '15px' }}>
+              {tx.memo && (
+                <div style={{ fontSize: getFontSize(), color: 'var(--amber)', marginLeft: '15px', marginBottom: '2px' }}>
+                  memo: {tx.memo as string}
+                </div>
+              )}
+            </div>
+          )}
+
+          {visibleColumns.includes('ops') && (
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: getFontSize(), color: 'var(--text-secondary)' }}>
+                {tx.operation_count} op{tx.operation_count !== 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)' }}>
+                {format(new Date(tx.created_at), 'MMM d, HH:mm')}
+              </div>
+            </div>
+          )}
+
+          {visibleColumns.includes('fee') && (
+            <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)' }}>
               fee: {tx.fee_charged} stroops
             </div>
-            {tx.source_account && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '15px' }}>
-                {addressLabels[tx.source_account] ? `${addressLabels[tx.source_account]} ` : ''}
-                <CopyableValue
-                  value={tx.source_account}
-                  title="Copy source account"
-                  textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-                >
-                  source: {shortAddress(tx.source_account)}
-                </CopyableValue>
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              {tx.operation_count} op{tx.operation_count !== 1 ? 's' : ''}
+          )}
+
+          {visibleColumns.includes('source') && tx.source_account && (
+            <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)' }}>
+              {addressLabels[tx.source_account] ? `${addressLabels[tx.source_account]} ` : ''}
+              <CopyableValue
+                value={tx.source_account}
+                title="Copy source account"
+                textStyle={{ fontSize: getFontSize(), color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+              >
+                source: {shortAddress(tx.source_account)}
+              </CopyableValue>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {format(new Date(tx.created_at), 'MMM d, HH:mm')}
-            </div>
-          </div>
+          )}
         </div>
       )}
     </VirtualList>
@@ -163,11 +202,37 @@ export const VirtualOpList = ({
   initialScrollTop = 0,
   onScrollPositionChange,
   addressLabels = {},
+  density = 'comfortable',
+  visibleColumns = ['type', 'time', 'accounts'],
 }: VirtualOpListProps) => {
+  const getRowHeight = () => {
+    switch (density) {
+      case 'compact': return OP_ROW_HEIGHT - 20;
+      case 'spacious': return OP_ROW_HEIGHT + 20;
+      default: return OP_ROW_HEIGHT;
+    }
+  };
+
+  const getPadding = () => {
+    switch (density) {
+      case 'compact': return '8px 12px';
+      case 'spacious': return '16px 24px';
+      default: return '12px 18px';
+    }
+  };
+
+  const getFontSize = () => {
+    switch (density) {
+      case 'compact': return '11px';
+      case 'spacious': return '13px';
+      default: return '12px';
+    }
+  };
+
   return (
     <VirtualList
       items={items}
-      rowHeight={OP_ROW_HEIGHT}
+      rowHeight={getRowHeight()}
       onLoadMore={onLoadMore}
       loading={loading}
       initialScrollTop={initialScrollTop}
@@ -178,10 +243,15 @@ export const VirtualOpList = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr auto',
+            gridTemplateColumns: visibleColumns.map(col => {
+              if (col === 'type') return '2fr';
+              if (col === 'time') return '1fr';
+              if (col === 'accounts') return '2fr';
+              return '1fr';
+            }).join(' '),
             gap: '12px',
             alignItems: 'center',
-            padding: '12px 18px',
+            padding: getPadding(),
             borderBottom: '1px solid var(--border)',
             transition: 'var(--transition)',
             height: '100%',
@@ -190,56 +260,66 @@ export const VirtualOpList = ({
           onMouseEnter={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = 'var(--bg-hover)')}
           onMouseLeave={(event: React.MouseEvent<HTMLDivElement>) => (event.currentTarget.style.background = isFocused ? 'var(--bg-hover)' : 'transparent')}
         >
-          <div>
-            <div style={{ fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>
-              <span
-                style={{
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border-bright)',
-                  borderRadius: '3px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
-                  color: 'var(--cyan)',
-                  marginRight: '8px',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {getOperationLabel(op.type)}
-              </span>
+          {visibleColumns.includes('type') && (
+            <div>
+              <div style={{ fontSize: getFontSize(), color: 'var(--text-primary)', marginBottom: '3px' }}>
+                <span
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-bright)',
+                    borderRadius: '3px',
+                    padding: '2px 6px',
+                    fontSize: getFontSize(),
+                    color: 'var(--cyan)',
+                    marginRight: '8px',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {getOperationLabel(op.type)}
+                </span>
+              </div>
+              {'amount' in op && op.amount && (
+                <div style={{ fontSize: getFontSize(), color: 'var(--amber)' }}>
+                  {parseFloat((op as unknown as Record<string, string>).amount).toFixed(4)} {'asset_code' in op ? (op as unknown as Record<string, string>).asset_code : 'XLM'}
+                </div>
+              )}
             </div>
-            {'from' in op && op.from && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {addressLabels[(op as unknown as Record<string, string>).from] ? `${addressLabels[(op as unknown as Record<string, string>).from]} ` : ''}
-                <CopyableValue
-                  value={(op as unknown as Record<string, string>).from}
-                  title="Copy source public key"
-                  textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-                >
-                  from: {shortAddress((op as unknown as Record<string, string>).from)}
-                </CopyableValue>
-              </div>
-            )}
-            {'to' in op && op.to && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {addressLabels[(op as unknown as Record<string, string>).to] ? `${addressLabels[(op as unknown as Record<string, string>).to]} ` : ''}
-                <CopyableValue
-                  value={(op as unknown as Record<string, string>).to}
-                  title="Copy destination public key"
-                  textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-                >
-                  to: {shortAddress((op as unknown as Record<string, string>).to)}
-                </CopyableValue>
-              </div>
-            )}
-            {'amount' in op && op.amount && (
-              <div style={{ fontSize: '11px', color: 'var(--amber)' }}>
-                {parseFloat((op as unknown as Record<string, string>).amount).toFixed(4)} {'asset_code' in op ? (op as unknown as Record<string, string>).asset_code : 'XLM'}
-              </div>
-            )}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
-            {format(new Date(op.created_at), 'MMM d, HH:mm')}
-          </div>
+          )}
+
+          {visibleColumns.includes('time') && (
+            <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)', flexShrink: 0 }}>
+              {format(new Date(op.created_at), 'MMM d, HH:mm')}
+            </div>
+          )}
+
+          {visibleColumns.includes('accounts') && (
+            <div>
+              {'from' in op && op.from && (
+                <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)' }}>
+                  {addressLabels[(op as unknown as Record<string, string>).from] ? `${addressLabels[(op as unknown as Record<string, string>).from]} ` : ''}
+                  <CopyableValue
+                    value={(op as unknown as Record<string, string>).from}
+                    title="Copy source public key"
+                    textStyle={{ fontSize: getFontSize(), color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+                  >
+                    from: {shortAddress((op as unknown as Record<string, string>).from)}
+                  </CopyableValue>
+                </div>
+              )}
+              {'to' in op && op.to && (
+                <div style={{ fontSize: getFontSize(), color: 'var(--text-muted)' }}>
+                  {addressLabels[(op as unknown as Record<string, string>).to] ? `${addressLabels[(op as unknown as Record<string, string>).to]} ` : ''}
+                  <CopyableValue
+                    value={(op as unknown as Record<string, string>).to}
+                    title="Copy destination public key"
+                    textStyle={{ fontSize: getFontSize(), color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+                  >
+                    to: {shortAddress((op as unknown as Record<string, string>).to)}
+                  </CopyableValue>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </VirtualList>

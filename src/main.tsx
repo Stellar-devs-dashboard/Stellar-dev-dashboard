@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles/globals.css";
+import "./styles/print.css";
 import { initPerformanceMonitoring } from "./lib/performance";
 import { registerServiceWorker } from "./utils/offline";
 import { installBrowserDiagnosticCapture } from "./lib/diagnostics";
