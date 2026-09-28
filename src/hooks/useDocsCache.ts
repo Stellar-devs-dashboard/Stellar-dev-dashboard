@@ -5,12 +5,17 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const DOCS_CACHE_NAME = 'stellar-docs-v1';
+const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB limit
+const CACHE_UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 
 interface DocsCacheState {
   isCached: boolean;
   isUpdating: boolean;
   lastUpdated: Date | null;
   error: string | null;
+  updateAvailable: boolean;
+  cacheSize: number;
+  cacheSizeLimit: number;
 }
 
 interface DocsCacheEntry {
@@ -25,6 +30,9 @@ export function useDocsCache() {
     isUpdating: false,
     lastUpdated: null,
     error: null,
+    updateAvailable: false,
+    cacheSize: 0,
+    cacheSizeLimit: MAX_CACHE_SIZE,
   });
 
   const [cachedDocs, setCachedDocs] = useState<DocsCacheEntry[]>([]);
@@ -46,17 +54,21 @@ export function useDocsCache() {
 
       if (keys.length > 0) {
         const entries: DocsCacheEntry[] = [];
+        let totalSize = 0;
 
         for (const request of keys) {
           const response = await cache.match(request);
           if (response) {
             const timestamp = parseInt(response.headers.get('x-cache-timestamp') || '0');
+            const size = response.headers.get('content-length')
+              ? parseInt(response.headers.get('content-length')!)
+              : 0;
+            totalSize += size;
+
             entries.push({
               url: request.url,
               timestamp: timestamp || Date.now(),
-              size: response.headers.get('content-length')
-                ? parseInt(response.headers.get('content-length')!)
-                : 0,
+              size,
             });
           }
         }
@@ -65,11 +77,18 @@ export function useDocsCache() {
           ? new Date(Math.max(...entries.map((e) => e.timestamp)))
           : null;
 
+        // Check if update is available (cache is older than 24 hours)
+        const updateAvailable = lastUpdated
+          ? Date.now() - lastUpdated.getTime() > CACHE_UPDATE_CHECK_INTERVAL
+          : false;
+
         setCachedDocs(entries);
         setState((prev) => ({
           ...prev,
           isCached: true,
           lastUpdated,
+          cacheSize: totalSize,
+          updateAvailable,
           error: null,
         }));
       } else {
@@ -77,6 +96,8 @@ export function useDocsCache() {
           ...prev,
           isCached: false,
           lastUpdated: null,
+          cacheSize: 0,
+          updateAvailable: false,
           error: null,
         }));
         setCachedDocs([]);
@@ -99,11 +120,34 @@ export function useDocsCache() {
 
     try {
       const cache = await caches.open(DOCS_CACHE_NAME);
+      let currentSize = 0;
+
+      // Calculate current cache size
+      const existingKeys = await cache.keys();
+      for (const request of existingKeys) {
+        const response = await cache.match(request);
+        if (response) {
+          const size = response.headers.get('content-length')
+            ? parseInt(response.headers.get('content-length')!)
+            : 0;
+          currentSize += size;
+        }
+      }
 
       for (const url of urls) {
         try {
           const response = await fetch(url);
           if (response.ok) {
+            const size = response.headers.get('content-length')
+              ? parseInt(response.headers.get('content-length')!)
+              : 0;
+
+            // Check if adding this would exceed cache limit
+            if (currentSize + size > MAX_CACHE_SIZE) {
+              console.warn(`Skipping ${url}: would exceed cache limit`);
+              continue;
+            }
+
             // Add timestamp header for tracking
             const headers = new Headers(response.headers);
             headers.set('x-cache-timestamp', Date.now().toString());
@@ -115,6 +159,7 @@ export function useDocsCache() {
             });
 
             await cache.put(url, cachedResponse);
+            currentSize += size;
           }
         } catch (error) {
           console.error(`Failed to cache ${url}:`, error);

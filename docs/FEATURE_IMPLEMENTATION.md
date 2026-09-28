@@ -32,6 +32,8 @@ Enhanced the Transactions and Analytics tables with sticky headers, density togg
 
 #### Modified Components
 - **Transactions.tsx**: Integrated EnhancedTable for both transactions and operations views
+- **Analytics.tsx**: Integrated EnhancedTable for risk signals and operation types tables
+- **AuditLog.tsx**: Integrated EnhancedTable for audit log entries with CSV export
 - **VirtualizedLists.tsx**: Added density and column visibility support to virtual lists
 
 #### Features

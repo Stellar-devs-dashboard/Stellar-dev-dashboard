@@ -30,6 +30,9 @@ describe('useDocsCache', () => {
     expect(result.current.isUpdating).toBe(false);
     expect(result.current.lastUpdated).toBeNull();
     expect(result.current.cachedDocs).toEqual([]);
+    expect(result.current.updateAvailable).toBe(false);
+    expect(result.current.cacheSize).toBe(0);
+    expect(result.current.cacheSizeLimit).toBe(50 * 1024 * 1024);
   });
 
   it('should check cache status on mount', async () => {
@@ -117,5 +120,55 @@ describe('useDocsCache', () => {
     });
 
     expect(result.current.error).toBe('Cache API not available');
+  });
+
+  it('should enforce cache size limit when caching documents', async () => {
+    const mockCache = {
+      keys: vi.fn().mockResolvedValue([]),
+      match: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    (global as any).caches.open = vi.fn().mockResolvedValue(mockCache);
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        'content-length': '100', // Small size
+      }),
+      body: new ReadableStream(),
+    });
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      const success = await result.current.cacheDocs(['/docs/test']);
+      expect(success).toBe(true);
+    });
+
+    expect(mockCache.put).toHaveBeenCalled();
+  });
+
+  it('should detect when cache update is available', async () => {
+    const oldTimestamp = Date.now() - (25 * 60 * 60 * 1000); // 25 hours ago
+    const mockCache = {
+      keys: vi.fn().mockResolvedValue([
+        { url: '/docs/test' }
+      ]),
+      match: vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({
+          'x-cache-timestamp': oldTimestamp.toString(),
+          'content-length': '1024',
+        }),
+      }),
+    };
+    (global as any).caches.open = vi.fn().mockResolvedValue(mockCache);
+
+    const { result } = renderHook(() => useDocsCache());
+
+    await act(async () => {
+      await result.current.checkCacheStatus();
+    });
+
+    expect(result.current.updateAvailable).toBe(true);
   });
 });

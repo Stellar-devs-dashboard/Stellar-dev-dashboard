@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useStore } from '../lib/store';
 import {
   isBiometricAvailable,
   registerBiometricCredential,
@@ -27,6 +28,7 @@ interface BiometricCacheState {
 
 export function useBiometricCache(options: BiometricCacheOptions) {
   const { userId, userName, autoLock = true, lockTimeout = 300000 } = options;
+  const { connectedAddress, accountData } = useStore();
 
   const [state, setState] = useState<BiometricCacheState>({
     isAvailable: false,
@@ -63,6 +65,8 @@ export function useBiometricCache(options: BiometricCacheOptions) {
 
     return () => clearTimeout(timer);
   }, [state.isAuthenticated, autoLock, lockTimeout]);
+
+
 
   const checkAvailability = useCallback(async () => {
     try {
@@ -158,6 +162,31 @@ export function useBiometricCache(options: BiometricCacheOptions) {
     [state.isAuthenticated, state.isLocked, userId]
   );
 
+  // Method to automatically cache current account data
+  const cacheCurrentAccountData = useCallback(async () => {
+    if (!state.isAuthenticated || state.isLocked) {
+      throw new Error('Must authenticate to cache account data');
+    }
+
+    if (connectedAddress && accountData) {
+      try {
+        const accountSnapshot = {
+          address: connectedAddress,
+          balance: accountData.balances,
+          sequence: accountData.sequence,
+          lastModified: Date.now(),
+        };
+        const encrypted = await encryptDataWithBiometric(JSON.stringify(accountSnapshot), userId);
+        setData((prev) => ({ ...prev, account_snapshot: encrypted }));
+        return true;
+      } catch (error) {
+        console.error('Failed to cache account data:', error);
+        return false;
+      }
+    }
+    return false;
+  }, [state.isAuthenticated, state.isLocked, connectedAddress, accountData, userId]);
+
   const getCachedData = useCallback(
     async (key: string): Promise<string | null> => {
       if (!state.isAuthenticated || state.isLocked) {
@@ -203,5 +232,6 @@ export function useBiometricCache(options: BiometricCacheOptions) {
     getCachedData,
     removeCachedData,
     clearError,
+    cacheCurrentAccountData,
   };
 }

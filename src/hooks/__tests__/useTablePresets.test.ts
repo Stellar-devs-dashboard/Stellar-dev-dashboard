@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('useTablePresets', () => {
   const mockTableId = 'test-table';
+  const mockInitialColumns = ['col1', 'col2'];
+  const mockInitialDensity = 'compact' as const;
 
   beforeEach(() => {
     localStorage.clear();
@@ -13,7 +15,15 @@ describe('useTablePresets', () => {
     localStorage.clear();
   });
 
-  it('should initialize with empty presets', () => {
+  it('should initialize with provided initial columns and density', () => {
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
+
+    expect(result.current.presets).toEqual([]);
+    expect(result.current.visibleColumns).toEqual(mockInitialColumns);
+    expect(result.current.density).toBe(mockInitialDensity);
+  });
+
+  it('should initialize with empty defaults when no initial values provided', () => {
     const { result } = renderHook(() => useTablePresets(mockTableId));
 
     expect(result.current.presets).toEqual([]);
@@ -22,7 +32,7 @@ describe('useTablePresets', () => {
   });
 
   it('should save a new preset', () => {
-    const { result } = renderHook(() => useTablePresets(mockTableId));
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
 
     act(() => {
       result.current.setVisibleColumns(['col1', 'col2']);
@@ -43,7 +53,7 @@ describe('useTablePresets', () => {
   });
 
   it('should delete a preset', () => {
-    const { result } = renderHook(() => useTablePresets(mockTableId));
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
 
     const preset = {
       id: 'preset-1',
@@ -66,7 +76,7 @@ describe('useTablePresets', () => {
   });
 
   it('should apply a preset', () => {
-    const { result } = renderHook(() => useTablePresets(mockTableId));
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
 
     const preset = {
       id: 'preset-1',
@@ -99,10 +109,35 @@ describe('useTablePresets', () => {
 
     localStorage.setItem('table-presets', JSON.stringify({ [mockTableId]: storedPresets }));
 
-    const { result } = renderHook(() => useTablePresets(mockTableId));
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
 
     expect(result.current.presets).toHaveLength(1);
     expect(result.current.presets[0].name).toBe('Stored Preset');
+  });
+
+  it('should load saved state from localStorage', () => {
+    const savedState = {
+      visibleColumns: ['col3', 'col4'],
+      density: 'spacious' as const,
+    };
+
+    localStorage.setItem('table-state', JSON.stringify({ [mockTableId]: savedState }));
+
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
+
+    expect(result.current.visibleColumns).toEqual(['col3', 'col4']);
+    expect(result.current.density).toBe('spacious');
+  });
+
+  it('should save state to localStorage when it changes', () => {
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
+
+    act(() => {
+      result.current.setVisibleColumns(['col5', 'col6']);
+    });
+
+    const savedState = JSON.parse(localStorage.getItem('table-state') || '{}');
+    expect(savedState[mockTableId].visibleColumns).toEqual(['col5', 'col6']);
   });
 
   it('should handle localStorage errors gracefully', () => {
@@ -112,7 +147,7 @@ describe('useTablePresets', () => {
       throw new Error('Storage error');
     });
 
-    const { result } = renderHook(() => useTablePresets(mockTableId));
+    const { result } = renderHook(() => useTablePresets(mockTableId, mockInitialColumns, mockInitialDensity));
 
     expect(result.current.presets).toEqual([]);
 

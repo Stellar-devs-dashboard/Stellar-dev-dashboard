@@ -2,7 +2,105 @@
  * Print-optimized styles for compliance and audit pages
  */
 
+/* Regulatory Report Templates */
+.regulatory-report-standard {
+  /* Standard compliance report format */
+}
+
+.regulatory-report-audit {
+  /* Audit trail format */
+}
+
+.regulatory-report-aml {
+  /* AML-specific format */
+}
+
+/* Regulatory report print styles */
 @media print {
+  .regulatory-report-standard .compliance-section {
+    page-break-after: always;
+  }
+
+  .regulatory-report-standard .compliance-section:last-child {
+    page-break-after: avoid;
+  }
+
+  .regulatory-report-audit .audit-log-entry {
+    page-break-inside: avoid;
+  }
+
+  .regulatory-report-aml .compliance-metric {
+    page-break-inside: avoid;
+  }
+
+  /* Report header for regulatory compliance */
+  .regulatory-header {
+    border-bottom: 3px solid #000;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    page-break-after: avoid;
+  }
+
+  .regulatory-header h1 {
+    font-size: 18pt;
+    margin: 0 0 10px 0;
+  }
+
+  .regulatory-header .report-meta {
+    font-size: 10pt;
+    color: #333;
+  }
+
+  /* Report footer */
+  .regulatory-footer {
+    border-top: 1px solid #000;
+    padding-top: 10px;
+    margin-top: 20px;
+    font-size: 9pt;
+    color: #666;
+    page-break-before: avoid;
+  }
+
+  /* Signature blocks */
+  .signature-block {
+    margin-top: 30px;
+    page-break-inside: avoid;
+  }
+
+  .signature-block .signature-line {
+    border-top: 1px solid #000;
+    width: 200px;
+    margin-top: 40px;
+  }
+
+  .signature-block .date-line {
+    border-top: 1px solid #000;
+    width: 150px;
+    margin-top: 40px;
+  }
+
+  /* Table of contents for reports */
+  .report-toc {
+    page-break-after: always;
+    margin-bottom: 20px;
+  }
+
+  .report-toc h2 {
+    font-size: 14pt;
+    margin-bottom: 15px;
+  }
+
+  .report-toc .toc-item {
+    margin: 8px 0;
+    font-size: 11pt;
+  }
+
+  .report-toc .toc-item .page-number {
+    float: right;
+  }
+}
+
+/* Existing print styles continue */
   /* Hide non-essential elements */
   .no-print,
   button,
