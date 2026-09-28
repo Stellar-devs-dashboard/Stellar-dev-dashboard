@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Printer, Shield, AlertTriangle, CheckCircle, Clock, Download, FileText } from 'lucide-react';
 import { useStore } from '../../lib/store';
 
 interface ComplianceMetric {
@@ -104,6 +104,52 @@ export default function ComplianceDashboard() {
     window.print();
   };
 
+  const handleExportCsv = () => {
+    const headers = ['Metric', 'Value', 'Status', 'Details'];
+    const metricRows = metrics.map(metric => [
+      metric.label,
+      metric.value,
+      metric.status,
+      metric.details || ''
+    ]);
+
+    const ruleHeaders = ['Rule Name', 'Description', 'Status', 'Last Checked'];
+    const ruleRows = rules.map(rule => [
+      rule.name,
+      rule.description,
+      rule.status,
+      new Date(rule.lastChecked).toISOString()
+    ]);
+
+    const csvContent = [
+      'COMPLIANCE METRICS',
+      headers.join(','),
+      ...metricRows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      '',
+      'COMPLIANCE RULES',
+      ruleHeaders.join(','),
+      ...ruleRows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      '',
+      `Generated on ${new Date().toISOString()}`,
+      `Network: ${network}`,
+      `Account: ${connectedAddress || 'Not connected'}`
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = () => {
+    // Generate print-friendly PDF by triggering print dialog
+    // Users can save as PDF from the print dialog
+    window.print();
+  };
+
   const getStatusIcon = (status: ComplianceMetric['status']) => {
     switch (status) {
       case 'compliant':
@@ -145,26 +191,68 @@ export default function ComplianceDashboard() {
             Monitor regulatory compliance status and rule adherence.
           </p>
         </div>
-        <button
-          onClick={handlePrint}
-          className="no-print"
-          style={{
-            padding: '8px 12px',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--text-secondary)',
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'var(--transition)',
-          }}
-        >
-          <Printer size={14} />
-          <span>Print Report</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleExportCsv}
+            className="no-print"
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'var(--transition)',
+            }}
+          >
+            <Download size={14} />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={handleExportPdf}
+            className="no-print"
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'var(--transition)',
+            }}
+          >
+            <FileText size={14} />
+            <span>Export PDF</span>
+          </button>
+          <button
+            onClick={handlePrint}
+            className="no-print"
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'var(--transition)',
+            }}
+          >
+            <Printer size={14} />
+            <span>Print Report</span>
+          </button>
+        </div>
       </div>
 
       <div className="print-only" style={{ fontSize: '10pt', color: '#666', marginBottom: '10px' }}>
